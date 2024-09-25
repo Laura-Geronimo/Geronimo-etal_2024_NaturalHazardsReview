@@ -69,7 +69,7 @@ Identifies damage function IDs recommended in HAZUS 5.1 Flood Model Technical Ma
 Identifies damage function IDs recommended in HAZUS 5.1 Flood Model Technical Manual p.5.8 Coastal A & V zone
 | Script Name      | Description                                                                                                                  | Link to Source Data                                                                                |
 |------------------|------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------|
-| `1_TR_MOD4_Cleaning_join_TS_gis_pin.rmd`        | Processes MOD-IV time series tax assessor data for Ortley Beach. Uses 2011 residential building data as a base and applies a 'frozen city' model, assuming no new development. Obtains improvement value and sales value by year, among other parcel level characteristics | [https://zenodo.org/records/10027236](https://modiv.rutgers.edu/)|
+| `1_TR_MOD4_Cleaning_join_TS_gis_pin.rmd`        | Processes MOD-IV time series tax assessor data for Ortley Beach (2011-2022). Uses 2011 residential building data as a base and applies a 'frozen city' model, assuming no new development. Obtains improvement value and sales value by year, among other parcel level characteristics | [https://zenodo.org/records/10027236](https://modiv.rutgers.edu/)|
 
 ## Reproduce my figures
 Use the scripts found in the `figures` directory to reproduce Figure 5 used in this publication.
