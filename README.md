@@ -145,6 +145,19 @@ Generates prospective estimates (2023-2062) of residual risk for rebuild scenari
 | `1_OB_AAL_Estimates.rmd`        | Processes First Street Average Annual Loss (AAL) parcel level data for low, mid, and high climate scenarios for 2021 and 2051. Estimates total AAL by cluster (S1, S3, S4) for years 2021 and 2051, from Licensed First Street Data.  | 
 | `2_OB_AAL_Interpolation_Discounting_ResidualRisk_Estimates.rmd`        | For each scenario, we take the total AAL for the properties in the scenario, and do linear interpolation to estimate the values for years 2012:2062. We then discount the AAL values at 2%, 3%, and 7%, and sum to obtain NPV by scenario. We call this the residual risk estimate.| 
 
+## 3 Scenario Analsyis
+### Folder location: scripts/workflow/3_ScenarioAnalysis
+Generates estimates of retrospective a) retrospective policy cost, b) prospective beach nourishment / protection cost and c) residual risk costs associated with each scenario, by discount rate and assumption (low, mid, high). Compares costs accross scenarios.
+
+| Script Name      | Description                                                                                                                          |
+|------------------|------------------------------------------------------------------------------------------------------------------------------|
+| `S0_ScenarioAnalysis.rmd`        | Estimates and analyzes costs for S0 | 
+| `S1_ScenarioAnalysis.rmd`        | Estimates and analyzes for S1 | 
+| `S2_ScenarioAnalysis.rmd`        | Estimates and analyzes for S2 | 
+| `S3_ScenarioAnalysis.rmd`        | Estimates and analyzes for S3 | 
+| `S4_ScenarioAnalysis.rmd`        | Estimates and analyzes for S4 | 
+| `ScenarioCompares.rmd`        | Compares total costs across scenarios by cost type, discount rate, and assumptions, and summarized information in a graphic and table | 
+
 ## Reproduce my figures
 Use the scripts found in the `figures` directory to reproduce Figure 5 used in this publication.
 The other figures were created in GIS, Excel, or powerpoint (see Figures power point)
