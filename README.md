@@ -39,9 +39,10 @@ _your software reference here_
 ## Data reference
 
 ### Input data
-Reference for each minted data source for your input data.  For example:
+Input data is obtained from various public or third party sources. All publicly available input data used in this analysis has been downloaded and can be
 
-Human, I.M. (2021). My input dataset name [Data set]. DataHub. https://doi.org/some-doi-number
+Geronimo, L. (2024). Input data for coastal risk analysis project [Data set]. Zenodo. https://doi.org/10.5281/zenodo.10.5281/zenodo.13835761
+
 
 _your input data references here_
 
