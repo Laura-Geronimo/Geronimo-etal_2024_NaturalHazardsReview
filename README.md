@@ -73,13 +73,7 @@ Identifies damage function IDs recommended in HAZUS 5.1 Flood Model Technical Ma
 | `2_OB_S3_S4_MOD4_TimeSeries.rmd`        | Produces subset of time series data for Scenario 3 and 4 (S3 & S4) based on gis_pin for the parcels in these clusters. Obtains improvement value and sales value by year, among other parcel level characteristics | [https://zenodo.org/records/10027236](https://modiv.rutgers.edu/)|
 | `3_OB_S1_S3_S4_2011_2022_Sales_Value.rmd`        | Estimates sales price by year for Ortley Beach properties by estimating the sales price per square foot for homes that sold that year, and multiplying by total square footage across properties. Extracts estimated 2011 sales price for properties in S1, S3, and S4 to estimate buyout cost | [https://zenodo.org/records/10027236](https://modiv.rutgers.edu/)|
 
-### Folder location: scripts/workflow/1_DataCleaning/4_OB_FirstStreet_RR
-Processes licensed First Street data
-| Script Name      | Description                                                                                                                  | Link to Source Data                                                                                |
-|------------------|------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------|
-| `OB_AAL.rmd`        | Processes First Street Average Annual Loss (AAL) parcel level data for low, mid, and high climate scenarios for 2021 and 2051. Estimates total AAL by cluster (S1, S3, S4) for years 2021 and 2051. | Licensed First Street Data|
-
-### Folder location: scripts/workflow/1_DataCleaning/5_NFIP/Claims
+### Folder location: scripts/workflow/1_DataCleaning/4_NFIP/Claims
 Processes National Flood Insurance Claims data
 | Script Name      | Description                                                                                                                  | Link to Source Data                                                                                |
 |------------------|------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------|
@@ -95,7 +89,7 @@ Processes National Flood Insurance Policies data
 
 ## 2 - Scenario Inputs
 ### Folder location: scripts/workflow/2_ScenarioInputs/1_Retrospective/1_MuniCostFrom_OB
-Generates Municipal cost estimates associated with the different Ortley Beach scenarios
+Generates Municipal cost estimates (2012-2022) associated with the different Ortley Beach scenarios, based on simplifying assumptions descriped in the manuscript and SI.
 | Script Name      | Description                                                                                                                          |
 |------------------|------------------------------------------------------------------------------------------------------------------------------|
 | `a_S1_MuniCostsFrom_OB_byYear_Preprocessing.rmd`        | Estimates the costs to Toms River municipality of maintaining properties on Ortley Beach for Scenario 1 (rebuild Ortley Beach), for 2012-2022, based on scenario assumptions. Downscales data to Ortley Beach| 
@@ -106,7 +100,7 @@ Generates Municipal cost estimates associated with the different Ortley Beach sc
 | `f_S4_MuniCostsFrom_OB.rmd`        | Estimates the NPV for costs to Toms River for Scenario 4. Discounts the costs and groups them into buckets for analysis |
 
 ### Folder location: scripts/workflow/2_ScenarioInputs/1_Retrospective/2_MuniRevFrom_OB
-Generates Municipal revenues estimates associated with the different Ortley Beach scenarios
+Generates Municipal revenues estimates (2012-2022) associated with the different Ortley Beach scenarios, based on simplifying assumptions descriped in the manuscript and SI.
 | Script Name      | Description                                                                                                                          |
 |------------------|------------------------------------------------------------------------------------------------------------------------------|
 | `a_S1_MuniCostsFrom_OB_byYear_Preprocessing.rmd`        | Estimates the costs to Toms River municipality of maintaining properties on Ortley Beach for Scenario 1 (rebuild Ortley Beach), for 2012-2022, based on scenario assumptions. Downscales data to Ortley Beach| 
@@ -117,15 +111,39 @@ Generates Municipal revenues estimates associated with the different Ortley Beac
 | `f_S4_MuniRevFrom_OB.rmd`        | Estimates the NPV for revenue to Toms River for Scenario 4. Discounts the revenues and groups them into buckets for analysis |
 
 ### Folder location: scripts/workflow/2_ScenarioInputs/1_Retrospective/3_FedCostFrom_OB
-Generates Federal Cost estimates associated with the different Ortley Beach scenarios
+Generates Federal Cost estimates (2012-2022) associated with the different Ortley Beach scenarios, based on simplifying assumptions descriped in the manuscript and SI.
 | Script Name      | Description                                                                                                                          |
 |------------------|------------------------------------------------------------------------------------------------------------------------------|
-| `a_S1_MuniCostsFrom_OB_byYear_Preprocessing.rmd`        | Estimates the costs to Toms River municipality of maintaining properties on Ortley Beach for Scenario 1 (rebuild Ortley Beach), for 2012-2022, based on scenario assumptions. Downscales data to Ortley Beach| 
-| `b_S1_MuniRevFrom_OB.rmd`        | Estimates the NPV for revenue to Toms River for Scenario 1. Discounts the revenues and groups them into buckets for analysis |
-| `c_S0_MuniRevFrom_OB.rmd`        | Estimates the NPV for revenue to Toms River for Scenario 0. Discounts the revenues and groups them into buckets for analysis |
-| `d_S2_MuniRevFrom_OB.rmd`        | Estimates the NPV for revenue to Toms River for Scenario 2. Discounts the revenues and groups them into buckets for analysis |
-| `e_S3_MuniRevFrom_OB.rmd`        | Estimates the NPV for revenue to Toms River for Scenario 3. Discounts the revenues and groups them into buckets for analysis |
-| `f_S4_MuniRevFrom_OB.rmd`        | Estimates the NPV for revenue to Toms River for Scenario 4. Discounts the revenues and groups them into buckets for analysis |
+| `a_S1_FedCostsFrom_OB_byYear_Preprocessing.rmd`        | Estimates the costs to the Federal Government of maintaining properties on Ortley Beach for Scenario 1 (rebuild Ortley Beach), for 2012-2022, based on scenario assumptions. Downscales data to Ortley Beach| 
+| `b_S1_FedCostsFrom_OB.rmd`        | Estimates the NPV for costs to the Federal Governmentfor Scenario 1. Discounts the costs and groups them into buckets for analysis |
+| `c_S0_FedCostsFrom_OB.rmd`        | Estimates the NPV for costs to the Federal Government for Scenario 0. Discounts the costs and groups them into buckets for analysis |
+| `d_S2_FedCostsFrom_OB.rmd`        | Estimates the NPV for costs to the Federal Governmentfor Scenario 2. Discounts the costs and groups them into buckets for analysis |
+| `e_S3_FedCostsFrom_OB.rmd`        | Estimates the NPV for costs to the Federal Governmentfor Scenario 3. Discounts the costs and groups them into buckets for analysis |
+| `f_S4_FedCostsFrom_OB.rmd`        | Estimates the NPV for costs to the Federal Governmentfor Scenario 4. Discounts the costs and groups them into buckets for analysis |
+
+### Folder location: scripts/workflow/2_ScenarioInputs/1_Retrospective/4_FedRevFrom_OB
+Generates Federal revenue estimates (2012-2022) associated with the different Ortley Beach scenarios, based on simplifying assumptions descriped in the manuscript and SI. 
+| Script Name      | Description                                                                                                                          |
+|------------------|------------------------------------------------------------------------------------------------------------------------------|
+| `a_S1_FedRevFrom_OB_byYear_Preprocessing.rmd`        | Estimates the revenues to the Federal Government of maintaining properties on Ortley Beach for Scenario 1 (rebuild Ortley Beach), for 2012-2022, based on scenario assumptions. Downscales data to Ortley Beach| 
+| `b_S1_FedRevFrom_OB.rmd`        | Estimates the NPV for revenue to the Federal Government for Scenario 1. Discounts the revenues and groups them into buckets for analysis |
+| `c_S0_FedRevFrom_OB.rmd`        | Estimates the NPV for revenue to the Federal Government for Scenario 0. Discounts the revenues and groups them into buckets for analysis |
+| `d_S2_FedRevFrom_OB.rmd`        | Estimates the NPV for revenue to the Federal Government for Scenario 2. Discounts the revenues and groups them into buckets for analysis |
+| `e_S3_FedRevFrom_OB.rmd`        | Estimates the NPV for revenue to the Federal Government for Scenario 3. Discounts the revenues and groups them into buckets for analysis |
+| `f_S4_FedRevFrom_OB.rmd`        | Estimates the NPV for revenue to the Federal Government for Scenario 4. Discounts the revenues and groups them into buckets for analysis |
+
+### Folder location: scripts/workflow/2_ScenarioInputs/2_Prospective/BeachNourishment_Estimated
+Generates prospective estimates (2023-2062) of protection costs associated with Beach Nourishment for rebuild scenarios, based on simplifying assumptions descriped in the manuscript and SI. 
+| Script Name      | Description                                                                                                                          |
+|------------------|------------------------------------------------------------------------------------------------------------------------------|
+| `OB_BeachNourish_Interpolation_Discounting_ProtectionCost_Estimates.rmd`        | Estimate Beach Nourishment costs for scenarios with properties remaining on the island, based on historical analysis of Beach nourishment investments and three scenarios (low, mid, high)| 
+
+### Folder location: scripts/workflow/2_ScenarioInputs/2_Prospective/FirstStreet_ResidualRiskEstimates
+Generates prospective estimates (2023-2062) of residual risk for rebuild scenarios, based on simplifying assumptions descriped in the manuscript and SI. 
+| Script Name      | Description                                                                                                                          |
+|------------------|------------------------------------------------------------------------------------------------------------------------------|
+| `1_OB_AAL_Estimates.rmd`        | Processes First Street Average Annual Loss (AAL) parcel level data for low, mid, and high climate scenarios for 2021 and 2051. Estimates total AAL by cluster (S1, S3, S4) for years 2021 and 2051, from Licensed First Street Data.  | 
+| `2_OB_AAL_Interpolation_Discounting_ResidualRisk_Estimates.rmd`        | For each scenario, we take the total AAL for the properties in the scenario, and do linear interpolation to estimate the values for years 2012:2062. We then discount the AAL values at 2%, 3%, and 7%, and sum to obtain NPV by scenario. We call this the residual risk estimate.| 
 
 ## Reproduce my figures
 Use the scripts found in the `figures` directory to reproduce Figure 5 used in this publication.
