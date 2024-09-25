@@ -1,0 +1,107 @@
+---
+title: "ScenarioComparison"
+author: "Laura Geronimo"
+date: "2024-09-23"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+#Importing data
+```{r include=FALSE}
+
+getwd()
+setwd('C:/Users/lgero/Box/Research/NJSG/Tradeoff_Analysis/V4')
+
+#libraries ####
+library(tidyverse)
+library(networkD3)
+library(dplyr)
+library(data.table)
+library(stringr)
+library(readxl)
+library(purrr)
+library(ggplot2)
+library(scales)
+library(knitr)
+library(formattable)
+
+options(scipen=999)
+
+
+##Importing Data ####
+S0_SumTable <- read.csv('./data/SummaryAndAnalysis/S0_SummaryTable.csv')
+S1_SumTable <- read.csv('./data/SummaryAndAnalysis/S1_SummaryTable.csv')
+S2_SumTable <- read.csv('./data/SummaryAndAnalysis/S2_SummaryTable.csv')
+S3_SumTable <- read.csv('./data/SummaryAndAnalysis/S3_SummaryTable.csv')
+S4_SumTable <- read.csv('./data/SummaryAndAnalysis/S4_SummaryTable.csv')
+```
+
+#Joining and formatting tables for analysis
+```{r include=FALSE}
+Compare <- rbind(S0_SumTable, S1_SumTable, S2_SumTable, S3_SumTable, S4_SumTable)
+
+```
+
+#Plotting
+```{r include=FALSE}
+library(tidyr)
+library(ggplot2)
+
+# Pivot the Compare dataframe
+long_Compare <- pivot_longer(Compare, cols = c(PolicyCost, ResidualRisk, ProtectionCost),
+                             names_to = "CostType", values_to = "Cost")
+
+# Set factor levels for CostType
+long_Compare$CostType <- factor(long_Compare$CostType, levels = c("ProtectionCost","ResidualRisk","PolicyCost"))
+
+# Set factor levels for Scenario and Assumption
+long_Compare$Scenario <- factor(long_Compare$Scenario, levels = c("S0","S1", "S2", "S3", "S4"))
+long_Compare$Assumption <- factor(long_Compare$Assumption, levels = c("High", "Mid", "Low"))
+
+# Create the plot with facet_grid
+ggplot(long_Compare, aes(x = DiscountRate, y = Cost, fill = CostType)) +
+  geom_bar(stat = "identity", position = "stack") +  # Stacked bars
+  facet_grid(Assumption ~ Scenario) +  # Rows are Assumption, columns are Scenario
+  labs(title = "Cost Breakdown Across Scenarios, \nDiscount Rates, and Assumptions",
+       x = "Discount Rate", y = "Cost", fill = "Cost Type") +
+   scale_fill_manual(values = c("PolicyCost" = "blue", "ResidualRisk" = "red", "ProtectionCost" = "black"),
+                    labels = c("PolicyCost" = "Policy Cost", "ResidualRisk" = "Residual Risk", "ProtectionCost" = "Protection Cost")) +
+  theme_minimal() +
+  geom_text(data = long_Compare, aes(x = DiscountRate, y = TotalCost, label =
+                                      scales::label_comma(scale = 1e-9, accuracy = 0.1)(TotalCost)),
+            vjust = -0.5, size = 3, color = "black") +  # Positioning text above the bars
+  theme_minimal() +
+  theme(strip.background = element_blank(),  # Optional: Remove background of facet labels
+        strip.text.y = element_text(angle = 0)) + # Optional: Rotate the facet labels for better visibility
+  scale_y_continuous(labels = label_dollar(scale = 1e-9, suffix = "B"), limits = c(0, 3500000000))+
+  labs(y = "Cost in Billions of dollars \n(2020USD)")
+
+```
+
+#identifying multiplier factor to bring S1 to S2 (for prospectie costs)
+```{include=false}
+
+
+# Calculate combined costs for S1 and S2
+combined_costs <- long_Compare %>%
+  filter(Scenario %in% c("S1", "S2")) %>%
+  group_by(Scenario, Assumption, DiscountRate) %>%
+  summarise(CombinedCost = sum(Cost[CostType %in% c("ResidualRisk", "ProtectionCost", "PolicyCost")]), .groups = 'drop')
+
+# View the combined costs
+print(combined_costs)
+
+# Calculate the multiplier
+multiplier <- combined_costs %>%
+  filter(Scenario == "S2") %>%
+  left_join(combined_costs %>% filter(Scenario == "S1"), by = c("Assumption", "DiscountRate"), suffix = c("_S2", "_S1")) %>%
+  mutate(Multiplier = CombinedCost_S2 / CombinedCost_S1)
+
+# View the multiplier results
+print(multiplier)
+
+```
