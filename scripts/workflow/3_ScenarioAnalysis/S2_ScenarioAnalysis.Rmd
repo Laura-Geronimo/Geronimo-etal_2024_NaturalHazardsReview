@@ -1,0 +1,284 @@
+---
+title: "Scenario 2 Analysis"
+author: "Laura Geronimo"
+date: "2024-09-16"
+output: html_document
+---
+
+In this worksheet we analyse and compare the total costs to society Scenario 1 across different assumptions, using best estimates.
+
+Recall the assumptions for S2 applied in prior worksheets:
+
+Assumptions:
+
+Federal policy costs:
+-Federal Cost Share for Municipal Response and Recovery (essential only for 2012 and 2013)
+    -PA Debris Removal (2012, 2013)
+    -PA Protective measures (2012, 2013)
+    -Repairs to Route 37 (2012, 2013)
+-Federal cost share for response and recovery direct to household (NA: redirected to buyouts)
+-Federal IA / NFIP claims (NA: redirected to buyouts)
+-Federal cost share for beach nourishment (NA)
+-Federal cost share for buyouts = 75% of market price for all homes
+-No NFIP premiums after 2012 because all homes have been relocated
+
+Municipal policy costs:
+-Municipal cost share for federal response and recovery (essential only for 2012 and 2013):
+    -From PA, retaining only debris removal and protective measures for 2012 and 2013
+    -NA on HMPG for Ortley Beach
+-Municipal cost share for beach nourishment (drops by 100%)NA
+-Municipal cost share for buyouts = 25% of market price for all homes
+
+Since all homes are relocated, we assume not residual risk or protection costs
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+#Importing data
+```{r include=FALSE}
+
+getwd()
+setwd('C:/Users/lgero/Box/Research/NJSG/Tradeoff_Analysis/V4')
+
+#libraries ####
+library(tidyverse)
+library(networkD3)
+library(dplyr)
+library(data.table)
+library(stringr)
+library(readxl)
+library(purrr)
+library(ggplot2)
+library(scales)
+library(knitr)
+#library(formattable)
+
+options(scipen=999)
+
+
+##Importing Data ####
+####Retrospective ####
+
+#S2
+S2_FedCostOB_NPV <- read.csv('./data/BaselineData/S2_OB_Inputs/S2_FedCostOB_NPV.csv')
+S2_FedRevOB_NPV <- read.csv('./data/BaselineData/S2_OB_Inputs/S2_FedRevOB_NPV.csv')
+S2_MuniCostOB_NPV <- read.csv('./data/BaselineData/S2_OB_Inputs/S2_MuniCostOB_NPV.csv')
+S2_MuniRevOB_NPV <- read.csv('./data/BaselineData/S2_OB_Inputs/S2_MuniRevOB_NPV.csv')
+
+
+```
+
+
+#S2: Analysis: 2% discount rate 
+###Total policy costs (Retrospective: 2012-2022)
+```{r inclue= FALSE}
+## Estimate of Retrospective Policy Cost to Rebuild Ortley Beach 2012-2022 
+
+#Estimate of total Response and recovery cost for municipality (Fed + Muni Share: essential only for 2012 and 2013)
+S2_ResponseRecoveryMuni_dis2pct <-
+  S2_FedCostOB_NPV$dis2pct[S2_FedCostOB_NPV$variable=="OB_FedShare_ToTR_ResponseRecovery"] +
+  S2_MuniCostOB_NPV$dis2pct[S2_MuniCostOB_NPV$variable=="OB_LocalShare_ResponseRecovery_adj"] 
+
+#Estimate of total Response and recovery cost for households (NA - redirected to buyouts)
+
+#Estimate of total costs to repair roads (Fed)
+S2_RepairRoadsBridges_dis2pct <-
+  S2_FedCostOB_NPV$dis2pct[S2_FedCostOB_NPV$variable=="OB_FedShare_DOT_Rt37_adj"] 
+
+#Estimate of total costs for beach nourishment (NA)
+
+#Estimate of NFIP policy costs (2012 only)
+S2_NFIP_PolicyCost_dis2pct <-
+  S2_FedRevOB_NPV$dis2pct[S2_FedRevOB_NPV$variable=="OB_NFIP_PolicyCost_adj"]
+
+#Estimate of NFIP claims (NA - redirected to buyout)
+
+#Estimate of 'hidden' costs of rebuilding to households (NA, no rebuilding)
+
+#Estimate of buyout costs (Fed + Muni share)
+S2_BuyoutCost_dis2pct <- 
+  S2_FedCostOB_NPV$dis2pct[S2_FedCostOB_NPV$variable=="OB_FedShare_BuyoutCost_adj"] +
+  S2_MuniCostOB_NPV$dis2pct[S2_MuniCostOB_NPV$variable=="OB_LocalShare_BuyoutCost_adj"]
+
+# Create a vector of the object names
+object_names <- c("S2_ResponseRecoveryMuni_dis2pct", 
+                  "S2_RepairRoadsBridges_dis2pct",
+                  "S2_NFIP_PolicyCost_dis2pct",
+                  "S2_BuyoutCost_dis2pct")
+
+
+# Use mget to get the values and names
+values <- mget(object_names)
+
+# Convert to a dataframe
+S2_PolicyCost_dis2pct <- data.frame(Label = names(values), Value = unlist(values))
+
+# Print the dataframe
+S2_PolicyCost_dis2pct
+
+# Total Policy cost
+S2_TotalPolicyCost_dis2pct <- sum(S2_PolicyCost_dis2pct$Value)
+```
+
+###Prospective costs (2022:2063) 
+####Protection Costs Assumption - NA
+####Residual Risk Assumption  - NA
+
+#S2: Analysis: 3% discount rate 
+###Total policy costs (Retrospective: 2012-2022)
+```{r inclue= FALSE}
+## Estimate of Retrospective Policy Cost to Rebuild Ortley Beach 2012-2022 
+
+#Estimate of total Response and recovery cost for municipality (Fed + Muni Share - (essential only for 2012 and 2013))
+S2_ResponseRecoveryMuni_dis3pct <-
+  S2_FedCostOB_NPV$dis3pct[S2_FedCostOB_NPV$variable=="OB_FedShare_ToTR_ResponseRecovery"] +
+  S2_MuniCostOB_NPV$dis3pct[S2_MuniCostOB_NPV$variable=="OB_LocalShare_ResponseRecovery_adj"] 
+
+#Estimate of total Response and recovery cost for households (NA - redirected to buyouts)
+
+#Estimate of total costs to repair roads (Fed)
+S2_RepairRoadsBridges_dis3pct <-
+  S2_FedCostOB_NPV$dis3pct[S2_FedCostOB_NPV$variable=="OB_FedShare_DOT_Rt37_adj"] 
+
+#Estimate of total costs for beach nourishment (NA)
+
+#Estimate of NFIP policy costs (2012 only)
+S2_NFIP_PolicyCost_dis3pct <-
+  S2_FedRevOB_NPV$dis3pct[S2_FedRevOB_NPV$variable=="OB_NFIP_PolicyCost_adj"]
+
+#Estimate of NFIP claims (NA - redirected to buyout)
+
+#Estimate of 'hidden' costs of rebuilding to households (NA, no rebuilding)
+
+#Estimate of buyout costs (Fed + Muni share)
+S2_BuyoutCost_dis3pct <- 
+  S2_FedCostOB_NPV$dis3pct[S2_FedCostOB_NPV$variable=="OB_FedShare_BuyoutCost_adj"] +
+  S2_MuniCostOB_NPV$dis3pct[S2_MuniCostOB_NPV$variable=="OB_LocalShare_BuyoutCost_adj"]
+
+# Create a vector of the object names
+object_names <- c("S2_ResponseRecoveryMuni_dis3pct", 
+                  "S2_RepairRoadsBridges_dis3pct",
+                  "S2_NFIP_PolicyCost_dis3pct",
+                  "S2_BuyoutCost_dis3pct")
+
+
+# Use mget to get the values and names
+values <- mget(object_names)
+
+# Convert to a dataframe
+S2_PolicyCost_dis3pct <- data.frame(Label = names(values), Value = unlist(values))
+
+# Print the dataframe
+S2_PolicyCost_dis3pct
+
+# Total Policy cost
+S2_TotalPolicyCost_dis3pct <- sum(S2_PolicyCost_dis3pct$Value)
+```
+
+###Prospective costs (2022:2063) 
+####Protection Costs Assumption - NA
+####Residual Risk Assumption  - NA
+
+#S2: Analysis: 7% discount rate 
+###Total policy costs (Retrospective: 2012-2022)
+```{r inclue= FALSE}
+## Estimate of Retrospective Policy Cost to Rebuild Ortley Beach 2012-2022 
+
+#Estimate of total Response and recovery cost for municipality (Fed + Muni Share - (essential only for 2012 and 2013))
+S2_ResponseRecoveryMuni_dis7pct <-
+  S2_FedCostOB_NPV$dis7pct[S2_FedCostOB_NPV$variable=="OB_FedShare_ToTR_ResponseRecovery"] +
+  S2_MuniCostOB_NPV$dis7pct[S2_MuniCostOB_NPV$variable=="OB_LocalShare_ResponseRecovery_adj"] 
+
+#Estimate of total Response and recovery cost for households (NA - redirected to buyouts)
+
+#Estimate of total costs to repair roads (Fed)
+S2_RepairRoadsBridges_dis7pct <-
+  S2_FedCostOB_NPV$dis7pct[S2_FedCostOB_NPV$variable=="OB_FedShare_DOT_Rt37_adj"] 
+
+#Estimate of total costs for beach nourishment (NA)
+
+#Estimate of NFIP policy costs (2012 only)
+S2_NFIP_PolicyCost_dis7pct <-
+  S2_FedRevOB_NPV$dis7pct[S2_FedRevOB_NPV$variable=="OB_NFIP_PolicyCost_adj"]
+
+#Estimate of NFIP claims (NA - redirected to buyout)
+
+#Estimate of 'hidden' costs of rebuilding to households (NA, no rebuilding)
+
+#Estimate of buyout costs (Fed + Muni share)
+S2_BuyoutCost_dis7pct <- 
+  S2_FedCostOB_NPV$dis7pct[S2_FedCostOB_NPV$variable=="OB_FedShare_BuyoutCost_adj"] +
+  S2_MuniCostOB_NPV$dis7pct[S2_MuniCostOB_NPV$variable=="OB_LocalShare_BuyoutCost_adj"]
+
+# Create a vector of the object names
+object_names <- c("S2_ResponseRecoveryMuni_dis7pct", 
+                  "S2_RepairRoadsBridges_dis7pct",
+                  "S2_NFIP_PolicyCost_dis7pct",
+                  "S2_BuyoutCost_dis7pct")
+
+
+# Use mget to get the values and names
+values <- mget(object_names)
+
+# Convert to a dataframe
+S2_PolicyCost_dis7pct <- data.frame(Label = names(values), Value = unlist(values))
+
+# Print the dataframe
+S2_PolicyCost_dis7pct
+
+# Total Policy cost
+S2_TotalPolicyCost_dis7pct <- sum(S2_PolicyCost_dis7pct$Value)
+```
+
+###Prospective costs (2022:2063) 
+####Protection Costs Assumption - NA
+####Residual Risk Assumption  - NA
+
+
+#Generating comparison table
+#Generating comparison table
+```{r include=FALSE}
+# Define values for PolicyCost, ResidualRisk, and ProtectionCost for each assumption
+S2_PolicyCost <- list(
+  Low = c(S2_TotalPolicyCost_dis2pct, S2_TotalPolicyCost_dis3pct, S2_TotalPolicyCost_dis7pct),
+  Mid = c(S2_TotalPolicyCost_dis2pct, S2_TotalPolicyCost_dis3pct, S2_TotalPolicyCost_dis7pct),
+  High = c(S2_TotalPolicyCost_dis2pct, S2_TotalPolicyCost_dis3pct, S2_TotalPolicyCost_dis7pct)
+)
+
+S2_ResidualRisk <- list(
+  Low = c(0,0,0),
+  Mid = c(0,0,0),
+  High = c(0,0,0)
+)
+
+S2_ProtectCost <- list(
+  Low = c(0,0,0),
+  Mid = c(0,0,0),
+  High = c(0,0,0)
+)
+
+# Combine into a single dataframe
+S2_SummaryTable <- data.frame(
+  Scenario = rep(c("S2"), times =9),
+  Assumption = rep(c("Low", "Mid", "High"), each = 3),
+  DiscountRate = rep(c("2%", "3%", "7%"), times = 3),
+  PolicyCost = unlist(S2_PolicyCost),
+  ResidualRisk = unlist(S2_ResidualRisk),
+  ProtectionCost = unlist(S2_ProtectCost)
+)
+
+# Calculate the total cost for each row
+S2_SummaryTable$TotalCost <- rowSums(S2_SummaryTable[, c("PolicyCost", "ResidualRisk", "ProtectionCost")])
+
+# Display the combined table
+rownames(S2_SummaryTable) <- NULL
+print(S2_SummaryTable)
+
+# Write out table
+path <- './data/SummaryAndAnalysis'
+write.csv(S2_SummaryTable, file.path(path, "S2_SummaryTable.csv"), row.names = FALSE)
+```
+
+

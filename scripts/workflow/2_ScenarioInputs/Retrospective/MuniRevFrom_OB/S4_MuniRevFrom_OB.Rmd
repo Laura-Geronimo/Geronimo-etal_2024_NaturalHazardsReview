@@ -1,0 +1,484 @@
+---
+title: "S4_Base_MuniRevFomOB_Table"
+author: "Laura Geronimo"
+date: "2024-08-29"
+output: html_document
+---
+The purpose of this worksheet is to estimate the NPV for benefits to Toms River for Scenario 4. We discount the benefits and group them into buckets for analysis.
+
+Assumptions for S4:
+  - Property Tax revenue (Muni): After 2013, only for remaining properties
+  - Property Tax revenue (school): After 2013, only for remaining properties
+  - Federal cost share for response & recovery: Assume Sticky expenditures (same as S1) 
+  - Federal cost share for roads and bridges: Assume Sticky expenditures (same as S1) 
+  - Federal cost share for beach nourishment: Assume doubles (doubling beach profile) 
+
+
+We discount at 2%, 3%, 6%, and 7% based on justifications provided in the SI.
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+#Importing data
+```{r include=FALSE}
+
+getwd()
+setwd('C:/Users/lgero/Box/Research/NJSG/Tradeoff_Analysis/V4')
+
+#libraries ####
+library(tidyverse)
+library(networkD3)
+library(dplyr)
+library(data.table)
+library(stringr)
+library(readxl)
+library(purrr)
+
+options(scipen=999)
+
+
+##Importing Data ####
+MuniRevOB <- read.csv('./data/BaselineData/S1_OB_Inputs/Revenues_ToTR_fromOB/MuniRevOB.csv')
+MuniRevOB <- MuniRevOB[,c(-1)]
+OB_S4_M4_TS <- read.csv('./data/BaselineData/OB_MOD4_Produced/TimeSeries/S4/OB_S4_MOD4_TimeSeries.csv')
+
+InflationAdjusters <- read.csv('./data/BaselineData/InflationAdjusters.csv')
+TR_TaxData <- read.csv('./data/BaselineData/TomsRiver_TaxData.csv')
+
+```
+
+
+
+#Adjusting inputs for property tax revenue####
+
+```{r include=FALSE}
+#Obtaining Estimated Property Tax data lost due to buyout cluster ####
+S4_MuniRevOB <- MuniRevOB
+
+#clearing out property value tax data post 2012 to make way for new inputs based on cluster
+S4_MuniRevOB$OB_PropTaxRevTo_TR_Muni_adj[S4_MuniRevOB$Year > 2012] <- NA
+S4_MuniRevOB$OB_PropTaxRevTo_TR_School_adj[S4_MuniRevOB$Year > 2012] <- NA
+
+#Obtaining improvement value for remaining properties in cluster 1 for years 2013-2022
+OB_S4 <- OB_S4_M4_TS %>%
+  select(ends_with(c("_improvement_value")))
+
+#imputing missing data based on means
+colSums(is.na(OB_S4))
+OB_S4_imp <- OB_S4 %>%
+  mutate(across(ends_with("_improvement_value"), 
+                ~ ifelse(is.na(.), mean(., na.rm = TRUE), .)))
+
+#creating totals by year
+OB_S4_y13_TotImpVal <- sum(OB_S4_imp$y13_improvement_value)
+OB_S4_y14_TotImpVal <- sum(OB_S4_imp$y14_improvement_value)
+OB_S4_y15_TotImpVal <- sum(OB_S4_imp$y15_improvement_value)
+OB_S4_y16_TotImpVal <- sum(OB_S4_imp$y16_improvement_value)
+OB_S4_y17_TotImpVal <- sum(OB_S4_imp$y17_improvement_value)
+OB_S4_y18_TotImpVal <- sum(OB_S4_imp$y18_improvement_value)
+OB_S4_y19_TotImpVal <- sum(OB_S4_imp$y19_improvement_value)
+OB_S4_y20_TotImpVal <- sum(OB_S4_imp$y20_improvement_value)
+OB_S4_y21_TotImpVal <- sum(OB_S4_imp$y21_improvement_value)
+OB_S4_y22_TotImpVal <- sum(OB_S4_imp$y22_improvement_value)
+
+TotImpVal <- c(OB_S4_y13_TotImpVal, OB_S4_y14_TotImpVal, OB_S4_y15_TotImpVal, OB_S4_y16_TotImpVal, OB_S4_y17_TotImpVal, OB_S4_y18_TotImpVal, OB_S4_y19_TotImpVal, OB_S4_y20_TotImpVal, OB_S4_y21_TotImpVal, OB_S4_y22_TotImpVal)
+
+OB_S4_A <- data.frame(
+  Year = 2013:2022,
+  OB_S4_TotalImprovementValue = TotImpVal)
+
+
+#adjusting improvement value based on equalization ratio and SLIPD
+## reducing tables for join
+TR_TaxData <- TR_TaxData %>%
+  select(Year, TR_Eq_Ratio, TR_TotalMuniTaxRate, TR_SchoolTaxRate)
+SLIPD <- InflationAdjusters %>%
+  select(Year, SLIPD_V3_Multiplier)
+
+## joining tables
+OB_S4_B <- left_join(OB_S4_A, TR_TaxData, by="Year")
+OB_S4_B <- left_join(OB_S4_B, SLIPD, by="Year")
+
+## adjusting improvement values by equalization ratio and SLIPD
+OB_S4_B$OB_S4_TotalImpVal_adj <- OB_S4_B$OB_S4_TotalImprovementValue * OB_S4_B$TR_Eq_Ratio * OB_S4_B$SLIPD_V3_Multiplier
+
+## Obtaining Net adjusted municipal benefits from property taxes LOST from buyout cluster
+OB_S4_B$OB_S4_PropTaxRevLOST_toTR_Muni_adj <- OB_S4_B$OB_S4_TotalImpVal_adj * OB_S4_B$TR_TotalMuniTaxRate
+
+## Obtaining Net adjusted school benefits from property taxes LOST from buyout cluster
+OB_S4_B$OB_S4_PropTaxRevLOST_toTR_School_adj <- OB_S4_B$OB_S4_TotalImpVal_adj * OB_S4_B$TR_SchoolTaxRate
+
+# Obtaining Estimated property taxes from remaining properties ####
+OB_S4_C <- OB_S4_B %>% select(
+  Year,OB_S4_PropTaxRevLOST_toTR_Muni_adj,OB_S4_PropTaxRevLOST_toTR_School_adj)
+
+#joining cluster data to original data
+OB_S4_D <- left_join(MuniRevOB, OB_S4_C, by="Year")
+
+#subtracting cluster revenues from total
+OB_S4_D$OB_S4_PropTaxRev_toTR_Muni_adj <- OB_S4_D$OB_PropTaxRevTo_TR_Muni_adj - OB_S4_D$OB_S4_PropTaxRevLOST_toTR_Muni_adj
+
+OB_S4_D$OB_S4_PropTaxRev_toTR_School_adj <- OB_S4_D$OB_PropTaxRevTo_TR_School_adj - OB_S4_D$OB_S4_PropTaxRevLOST_toTR_School_adj
+
+#keeping original 2012 data
+OB_S4_D$OB_S4_PropTaxRev_toTR_Muni_adj[OB_S4_D$Year == 2012] <- OB_S4_D$OB_PropTaxRevTo_TR_Muni_adj[OB_S4_D$Year == 2012]
+
+OB_S4_D$OB_S4_PropTaxRev_toTR_School_adj[OB_S4_D$Year == 2012] <- OB_S4_D$OB_PropTaxRevTo_TR_School_adj[OB_S4_D$Year == 2012]
+
+#Dropping unneccessary columns
+OB_S4_E <- OB_S4_D %>%
+  select(-OB_PropTaxRevTo_TR_Muni_adj,
+         -OB_PropTaxRevTo_TR_School_adj,
+         -OB_S4_PropTaxRevLOST_toTR_Muni_adj,
+         -OB_S4_PropTaxRevLOST_toTR_School_adj)
+
+
+```
+
+
+#Discounting values to 2%, summing to NPV, and grouping in buckets
+```{r include=FALSE}
+S4_MuniRevOB <- OB_S4_E
+
+###discounting flows at 2% ####
+#Creating a year index 
+S4_MuniRevOB$YearIndex <- 0:10
+
+#Define the function for discounting flows by 2% 
+dis2pct <- function(df, amount_cols, year_index_col, discount_rate = 0.02, base_year = 0) {
+  for (col in amount_cols) {
+    discounted_col_name <- paste0(col, "_dis2pct")
+    df[[discounted_col_name]] <- df[[col]] / ((1 + discount_rate) ^ (df[[year_index_col]] - base_year))
+  }
+  return(df)
+}
+
+# List of columns to discount - select colums starting with OB 
+amount_cols <-  grep("^OB_", colnames(S4_MuniRevOB), value = TRUE)
+
+# Apply the discount function
+S4_MuniRevOB_dis2pct <- dis2pct(S4_MuniRevOB, amount_cols, year_index_col = "YearIndex")
+
+# Remove undiscounted columns
+S4_MuniRevOB_dis2pct <- S4_MuniRevOB_dis2pct %>%
+  select(Year, YearIndex, ends_with("_dis2pct"))
+
+###Summing to NPV ####
+#Create a new data frame that sums the discounted columns for NPV (2020USD)
+S4_MuniRevOB_dis2pct_NPV <- S4_MuniRevOB_dis2pct %>%
+  summarise(across(ends_with("_dis2pct"), sum, na.rm = TRUE))
+
+###creating buckets ####
+#Summing Federal Flows for Response and Recovery
+S4_MuniRevOB_dis2pct_NPV<- S4_MuniRevOB_dis2pct_NPV %>%
+  mutate(OB_FedShare_ResponseRecovery_dis2pct= 
+           OB_FedShare_DCA_LGS_LMI_adj_dis2pct +
+           OB_FedShare_DCA_LGS_UN_adj_dis2pct +
+           OB_FedShare_DCA_LPS_adj_dis2pct +
+           OB_FedShare_DCA_ZCEG_UN_adj_dis2pct +
+           OB_FedShare_HMGP_adj_dis2pct +
+           OB_FedShare_PA_Debris_adj_dis2pct +
+           OB_FedShare_PA_Protect_adj_dis2pct +
+           OB_FedShare_PA_PublicBuildings_adj_dis2pct +
+           OB_FedShare_PA_PublicUtilities_adj_dis2pct +
+           OB_FedShare_PA_Recreational_adj_dis2pct +
+           OB_FedShare_CDL_Muni_adj_dis2pct +
+           OB_FedShare_CDL_School_adj_dis2pct +
+           OB_FedShare_CDL_Services_adj_dis2pct)
+                                                          
+#Summing Federal Flows for Transportation
+S4_MuniRevOB_dis2pct_NPV<- S4_MuniRevOB_dis2pct_NPV %>%
+  mutate(OB_FedShare_RoadsBridges_dis2pct= 
+           OB_FedShare_PA_RoadsBridges_adj_dis2pct +
+           OB_FedShare_DOT_Rt35_adj_dis2pct +
+           OB_FedShare_DOT_Rt37_adj_dis2pct +
+           OB_FedShare_DOT_LocalAid_adj_dis2pct)
+
+#selecting variables
+
+
+S4_MuniRevOB_dis2pct_NPV <- S4_MuniRevOB_dis2pct_NPV %>%
+  select(OB_S4_PropTaxRev_toTR_Muni_adj_dis2pct,
+         OB_S4_PropTaxRev_toTR_School_adj_dis2pct,
+         OB_FedShare_ResponseRecovery_dis2pct,
+         OB_FedShare_RoadsBridges_dis2pct,
+         OB_FedShare_BeachNourish_adj_dis2pct)
+
+#pivoting tables longer
+S4_MuniRevOB_dis2pct_NPV <- S4_MuniRevOB_dis2pct_NPV %>%
+  pivot_longer(
+    cols = everything(),      # Pivot all columns
+    names_to = "variable",     # New column with variable names
+    values_to = "dis2pct"      # New column with the values
+  ) %>%
+  mutate(variable = sub("_dis2pct", "", variable)) 
+```
+
+
+
+
+#Discounting values to 3%, summing to NPV, and grouping in buckets
+```{r include=FALSE}
+
+###discounting flows at 3% ####
+#Creating a year index 
+S4_MuniRevOB$YearIndex <- 0:10
+
+#Define the function for discounting flows by 3% 
+diS4pct <- function(df, amount_cols, year_index_col, discount_rate = 0.03, base_year = 0) {
+  for (col in amount_cols) {
+    discounted_col_name <- paste0(col, "_dis3pct")
+    df[[discounted_col_name]] <- df[[col]] / ((1 + discount_rate) ^ (df[[year_index_col]] - base_year))
+  }
+  return(df)
+}
+
+# List of columns to discount - select colums starting with OB 
+amount_cols <-  grep("^OB_", colnames(S4_MuniRevOB), value = TRUE)
+
+# Apply the discount function
+S4_MuniRevOB_dis3pct <- diS4pct(S4_MuniRevOB, amount_cols, year_index_col = "YearIndex")
+
+# Remove undiscounted columns
+S4_MuniRevOB_dis3pct <- S4_MuniRevOB_dis3pct %>%
+  select(Year, YearIndex, ends_with("_dis3pct"))
+
+###Summing to NPV ####
+#Create a new data frame that sums the discounted columns for NPV (3030USD)
+S4_MuniRevOB_dis3pct_NPV <- S4_MuniRevOB_dis3pct %>%
+  summarise(across(ends_with("_dis3pct"), sum, na.rm = TRUE))
+
+###creating buckets ####
+#Summing Federal Flows for Response and Recovery
+S4_MuniRevOB_dis3pct_NPV<- S4_MuniRevOB_dis3pct_NPV %>%
+  mutate(OB_FedShare_ResponseRecovery_dis3pct= 
+           OB_FedShare_DCA_LGS_LMI_adj_dis3pct +
+           OB_FedShare_DCA_LGS_UN_adj_dis3pct +
+           OB_FedShare_DCA_LPS_adj_dis3pct +
+           OB_FedShare_DCA_ZCEG_UN_adj_dis3pct +
+           OB_FedShare_HMGP_adj_dis3pct +
+           OB_FedShare_PA_Debris_adj_dis3pct +
+           OB_FedShare_PA_Protect_adj_dis3pct +
+           OB_FedShare_PA_PublicBuildings_adj_dis3pct +
+           OB_FedShare_PA_PublicUtilities_adj_dis3pct +
+           OB_FedShare_PA_Recreational_adj_dis3pct +
+           OB_FedShare_CDL_Muni_adj_dis3pct +
+           OB_FedShare_CDL_School_adj_dis3pct +
+           OB_FedShare_CDL_Services_adj_dis3pct)
+                                                          
+#Summing Federal Flows for Transportation
+S4_MuniRevOB_dis3pct_NPV<- S4_MuniRevOB_dis3pct_NPV %>%
+  mutate(OB_FedShare_RoadsBridges_dis3pct= 
+           OB_FedShare_PA_RoadsBridges_adj_dis3pct +
+           OB_FedShare_DOT_Rt35_adj_dis3pct +
+           OB_FedShare_DOT_Rt37_adj_dis3pct +
+           OB_FedShare_DOT_LocalAid_adj_dis3pct)
+
+#selecting variables
+S4_MuniRevOB_dis3pct_NPV <- S4_MuniRevOB_dis3pct_NPV %>%
+  select(OB_S4_PropTaxRev_toTR_Muni_adj_dis3pct,
+         OB_S4_PropTaxRev_toTR_School_adj_dis3pct,
+         OB_FedShare_ResponseRecovery_dis3pct,
+         OB_FedShare_RoadsBridges_dis3pct,
+         OB_FedShare_BeachNourish_adj_dis3pct)
+
+#pivoting tables longer
+S4_MuniRevOB_dis3pct_NPV <- S4_MuniRevOB_dis3pct_NPV %>%
+  pivot_longer(
+    cols = everything(),      # Pivot all columns
+    names_to = "variable",     # New column with variable names
+    values_to = "dis3pct"      # New column with the values
+  ) %>%
+  mutate(variable = sub("_dis3pct", "", variable)) 
+```
+
+
+#Discounting values to 6%, summing to NPV, and grouping in buckets
+```{r include=FALSE}
+
+###discounting flows at 6% ####
+#Creating a year index 
+S4_MuniRevOB$YearIndex <- 0:10
+
+#Define the function for discounting flows by 6% 
+dis6pct <- function(df, amount_cols, year_index_col, discount_rate = 0.06, base_year = 0) {
+  for (col in amount_cols) {
+    discounted_col_name <- paste0(col, "_dis6pct")
+    df[[discounted_col_name]] <- df[[col]] / ((1 + discount_rate) ^ (df[[year_index_col]] - base_year))
+  }
+  return(df)
+}
+
+# List of columns to discount - select colums starting with OB 
+amount_cols <-  grep("^OB_", colnames(S4_MuniRevOB), value = TRUE)
+
+# Apply the discount function
+S4_MuniRevOB_dis6pct <- dis6pct(S4_MuniRevOB, amount_cols, year_index_col = "YearIndex")
+
+# Remove undiscounted columns
+S4_MuniRevOB_dis6pct <- S4_MuniRevOB_dis6pct %>%
+  select(Year, YearIndex, ends_with("_dis6pct"))
+
+###Summing to NPV ####
+#Create a new data frame that sums the discounted columns for NPV (6060USD)
+S4_MuniRevOB_dis6pct_NPV <- S4_MuniRevOB_dis6pct %>%
+  summarise(across(ends_with("_dis6pct"), sum, na.rm = TRUE))
+
+###creating buckets ####
+#Summing Federal Flows for Response and Recovery
+S4_MuniRevOB_dis6pct_NPV<- S4_MuniRevOB_dis6pct_NPV %>%
+  mutate(OB_FedShare_ResponseRecovery_dis6pct= 
+           OB_FedShare_DCA_LGS_LMI_adj_dis6pct +
+           OB_FedShare_DCA_LGS_UN_adj_dis6pct +
+           OB_FedShare_DCA_LPS_adj_dis6pct +
+           OB_FedShare_DCA_ZCEG_UN_adj_dis6pct +
+           OB_FedShare_HMGP_adj_dis6pct +
+           OB_FedShare_PA_Debris_adj_dis6pct +
+           OB_FedShare_PA_Protect_adj_dis6pct +
+           OB_FedShare_PA_PublicBuildings_adj_dis6pct +
+           OB_FedShare_PA_PublicUtilities_adj_dis6pct +
+           OB_FedShare_PA_Recreational_adj_dis6pct +
+           OB_FedShare_CDL_Muni_adj_dis6pct +
+           OB_FedShare_CDL_School_adj_dis6pct +
+           OB_FedShare_CDL_Services_adj_dis6pct)
+                                                          
+#Summing Federal Flows for Transportation
+S4_MuniRevOB_dis6pct_NPV<- S4_MuniRevOB_dis6pct_NPV %>%
+  mutate(OB_FedShare_RoadsBridges_dis6pct= 
+           OB_FedShare_PA_RoadsBridges_adj_dis6pct +
+           OB_FedShare_DOT_Rt35_adj_dis6pct +
+           OB_FedShare_DOT_Rt37_adj_dis6pct +
+           OB_FedShare_DOT_LocalAid_adj_dis6pct)
+
+#selecting variables
+S4_MuniRevOB_dis6pct_NPV <- S4_MuniRevOB_dis6pct_NPV %>%
+  select(OB_S4_PropTaxRev_toTR_Muni_adj_dis6pct,
+         OB_S4_PropTaxRev_toTR_School_adj_dis6pct,
+         OB_FedShare_ResponseRecovery_dis6pct,
+         OB_FedShare_RoadsBridges_dis6pct,
+         OB_FedShare_BeachNourish_adj_dis6pct)
+
+
+#pivoting tables longer
+S4_MuniRevOB_dis6pct_NPV <- S4_MuniRevOB_dis6pct_NPV %>%
+  pivot_longer(
+    cols = everything(),      # Pivot all columns
+    names_to = "variable",     # New column with variable names
+    values_to = "dis6pct"      # New column with the values
+  ) %>%
+  mutate(variable = sub("_dis6pct", "", variable)) 
+```
+
+
+
+#Discounting values to 7%, summing to NPV, and grouping in buckets
+```{r include=FALSE}
+
+###discounting flows at 7% ####
+#Creating a year index 
+S4_MuniRevOB$YearIndex <- 0:10
+
+#Define the function for discounting flows by 7% 
+dis7pct <- function(df, amount_cols, year_index_col, discount_rate = 0.07, base_year = 0) {
+  for (col in amount_cols) {
+    discounted_col_name <- paste0(col, "_dis7pct")
+    df[[discounted_col_name]] <- df[[col]] / ((1 + discount_rate) ^ (df[[year_index_col]] - base_year))
+  }
+  return(df)
+}
+
+# List of columns to discount - select colums starting with OB 
+amount_cols <-  grep("^OB_", colnames(S4_MuniRevOB), value = TRUE)
+
+# Apply the discount function
+S4_MuniRevOB_dis7pct <- dis7pct(S4_MuniRevOB, amount_cols, year_index_col = "YearIndex")
+
+# Remove undiscounted columns
+S4_MuniRevOB_dis7pct <- S4_MuniRevOB_dis7pct %>%
+  select(Year, YearIndex, ends_with("_dis7pct"))
+
+###Summing to NPV ####
+#Create a new data frame that sums the discounted columns for NPV (7070USD)
+S4_MuniRevOB_dis7pct_NPV <- S4_MuniRevOB_dis7pct %>%
+  summarise(across(ends_with("_dis7pct"), sum, na.rm = TRUE))
+
+###creating buckets ####
+#Summing Federal Flows for Response and Recovery
+S4_MuniRevOB_dis7pct_NPV<- S4_MuniRevOB_dis7pct_NPV %>%
+  mutate(OB_FedShare_ResponseRecovery_dis7pct= 
+           OB_FedShare_DCA_LGS_LMI_adj_dis7pct +
+           OB_FedShare_DCA_LGS_UN_adj_dis7pct +
+           OB_FedShare_DCA_LPS_adj_dis7pct +
+           OB_FedShare_DCA_ZCEG_UN_adj_dis7pct +
+           OB_FedShare_HMGP_adj_dis7pct +
+           OB_FedShare_PA_Debris_adj_dis7pct +
+           OB_FedShare_PA_Protect_adj_dis7pct +
+           OB_FedShare_PA_PublicBuildings_adj_dis7pct +
+           OB_FedShare_PA_PublicUtilities_adj_dis7pct +
+           OB_FedShare_PA_Recreational_adj_dis7pct +
+           OB_FedShare_CDL_Muni_adj_dis7pct +
+           OB_FedShare_CDL_School_adj_dis7pct +
+           OB_FedShare_CDL_Services_adj_dis7pct)
+                                                          
+#Summing Federal Flows for Transportation
+S4_MuniRevOB_dis7pct_NPV<- S4_MuniRevOB_dis7pct_NPV %>%
+  mutate(OB_FedShare_RoadsBridges_dis7pct= 
+           OB_FedShare_PA_RoadsBridges_adj_dis7pct +
+           OB_FedShare_DOT_Rt35_adj_dis7pct +
+           OB_FedShare_DOT_Rt37_adj_dis7pct +
+           OB_FedShare_DOT_LocalAid_adj_dis7pct)
+
+#selecting variables
+S4_MuniRevOB_dis7pct_NPV <- S4_MuniRevOB_dis7pct_NPV %>%
+  select(OB_S4_PropTaxRev_toTR_Muni_adj_dis7pct,
+         OB_S4_PropTaxRev_toTR_School_adj_dis7pct,
+         OB_FedShare_ResponseRecovery_dis7pct,
+         OB_FedShare_RoadsBridges_dis7pct,
+         OB_FedShare_BeachNourish_adj_dis7pct)
+
+#pivoting tables longer
+S4_MuniRevOB_dis7pct_NPV <- S4_MuniRevOB_dis7pct_NPV %>%
+  pivot_longer(
+    cols = everything(),      # Pivot all columns
+    names_to = "variable",     # New column with variable names
+    values_to = "dis7pct"      # New column with the values
+  ) %>%
+  mutate(variable = sub("_dis7pct", "", variable)) 
+```
+
+
+
+
+#Joining data for export
+```{r include = FALSE}
+#pivoting tables longer
+S4_MuniRevOB_NPV <- S4_MuniRevOB_dis2pct_NPV %>%
+  left_join(S4_MuniRevOB_dis3pct_NPV, by = "variable") %>%
+  left_join(S4_MuniRevOB_dis6pct_NPV, by = "variable") %>%
+  left_join(S4_MuniRevOB_dis7pct_NPV, by = "variable")
+
+```
+
+#Writing out discounted NPV files
+```{r include= FALSE}
+path <- './data/BaselineData/S4_OB_Inputs'
+
+write.csv(S4_MuniRevOB_NPV, file.path(path, "S4_MuniRevOB_NPV.csv"), row.names = TRUE)
+
+```
+
+#QC
+```{r include= FALSE}
+S4_MuniRevOB_dis2pct_NPV <- sum(S4_MuniRevOB_NPV$dis2pct)
+S4_MuniRevOB_dis3pct_NPV <- sum(S4_MuniRevOB_NPV$dis3pct)
+S4_MuniRevOB_dis6pct_NPV <- sum(S4_MuniRevOB_NPV$dis6pct)
+S4_MuniRevOB_dis7pct_NPV <- sum(S4_MuniRevOB_NPV$dis7pct)
+
+S4_MuniRevOB_dis2pct_NPV
+S4_MuniRevOB_dis3pct_NPV
+S4_MuniRevOB_dis6pct_NPV
+S4_MuniRevOB_dis7pct_NPV
+```

@@ -1,0 +1,136 @@
+---
+title: "NJST: DHS Dataset"
+author: "Laura Geronimo"
+date: '2024-08-23'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r include=FALSE}
+
+getwd()
+setwd ('C:/Users/lgero/Box/Research/NJSG/Tradeoff_Analysis/V4')
+
+#libraries ####
+library(tidyverse)
+library(networkD3)
+library(dplyr)
+library(data.table)
+
+##Importing Data
+DHS <- read.csv('./data/DataDownloads/NJ_SandyTransparencyData/State_Agency_Datasets/Sandy_DHS_Master_Data.csv')
+
+## Explore####
+colSums(is.na(DHS))
+table(DHS$Project)
+
+```
+
+## Part 1: DHS Cumulative Cost Share by County
+### Part 1.A: PA Assistance (Federal Cost Share) by County by Project Type
+```{r, include=FALSE}
+
+#Q1.A: PA by Project by County
+
+# 1.A.1. nodes --------------------------------------------------------------------
+names(DHS)
+
+sankey_nodes1A <- list(
+  DHS %>% select(6) %>% unique,
+  DHS %>% select(9) %>% unique) %>% 
+  unlist(use.names = F) %>% 
+  unique()
+# 
+sankey_nodes1A <- sankey_nodes1A %>% data.frame(names = .)
+
+sankey_nodes1A_df <- sankey_nodes1A %>% 
+  mutate(node_id = 0:(nrow(sankey_nodes1A)-1))
+
+# 1.A.2.  Links -------------------------------------------------------------
+
+link_1A <- DHS %>% 
+  select(`Project`, County, `Disbursed.Amount`) %>% 
+  group_by(`Project`, County) %>% 
+  summarise(value=sum(`Disbursed.Amount`,na.rm = T))%>% 
+  ungroup()
+names(link_1A) <- c('names_src','names_tgt','value')
+
+# 1.A.3. Merging nodes in links
+#getting source and target numbers in 
+link_1A <- left_join(link_1A, sankey_nodes1A_df, by=c("names_src"= "names"), copy=F)
+link_1A <- left_join(link_1A, sankey_nodes1A_df, by=c("names_tgt"= "names"), copy=F)
+
+names(link_1A)
+names(link_1A) <- c('names_src','names_tgt','value', 'source', 'target')
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+# 1.A.4. Visualization --------------------------------------------------------
+
+p1A <- sankeyNetwork(Links = link_1A, 
+                   Nodes = sankey_nodes1A_df, 
+                   Source = "source", Target = "target", Value = "value", 
+                   NodeID = "names",
+                   units = "$", fontSize = 12, nodeWidth = 30,
+                   iterations= 0)
+p1A
+```
+
+```{r, include=FALSE}
+#Part 2: PA cumulative cost share by municipality (local and federal) by project type in Ocean County
+    #A. how much PA assistance (Federal Share) went to each municipality by project type
+
+DHS_Ocean <- subset(DHS, County=="OCEAN")
+
+
+#Q2.A: PA_OCEAN by Project by Municipality
+
+# 2.A.1. nodes --------------------------------------------------------------------
+names(DHS_Ocean)
+
+sankey_nodes2A <- list(
+  DHS_Ocean %>% select(6) %>% unique,
+  DHS_Ocean %>% select(10) %>% unique) %>% 
+  unlist(use.names = F) %>% 
+  unique()
+# 
+sankey_nodes2A <- sankey_nodes2A %>% data.frame(names = .)
+
+sankey_nodes2A_df <- sankey_nodes2A %>% 
+  mutate(node_id = 0:(nrow(sankey_nodes2A)-1))
+
+# 2.A.2.  Links -------------------------------------------------------------
+
+link_2A <- DHS_Ocean %>% 
+  select(`Project`, Municipality, `Disbursed.Amount`) %>% 
+  group_by(`Project`, Municipality) %>% 
+  summarise(value=sum(`Disbursed.Amount`,na.rm = T))%>% 
+  ungroup()
+names(link_2A) <- c('names_src','names_tgt','value')
+
+# 2.A.3. Merging nodes in links
+#getting source and target numbers in 
+link_2A <- left_join(link_2A, sankey_nodes2A_df, by=c("names_src"= "names"), copy=F)
+link_2A <- left_join(link_2A, sankey_nodes2A_df, by=c("names_tgt"= "names"), copy=F)
+
+names(link_2A)
+names(link_2A) <- c('names_src','names_tgt','value', 'source', 'target')
+```
+
+```{r echo=FALSE,  message=FALSE, warning=FALSE}
+# 2.A.4. Visualization --------------------------------------------------------
+
+p2A <- sankeyNetwork(Links = link_2A, 
+                   Nodes = sankey_nodes2A_df, 
+                   Source = "source", Target = "target", Value = "value", 
+                   NodeID = "names",
+                   units = "$", fontSize = 12, nodeWidth = 30,
+                   iterations= 0)
+p2A
+
+#### Toms river township $480,940
+```
+

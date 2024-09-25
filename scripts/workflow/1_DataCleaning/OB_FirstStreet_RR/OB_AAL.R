@@ -1,0 +1,202 @@
+##Purpose: The purpose of this file is to estimate Average Annual Losses by scenarios where homes remain on the island (S1, S3, S4)
+#Given limited data on the low and high climate scenario estimates, we use the mid-level scenario
+#
+
+#Setup
+getwd()
+setwd('C:/Users/lgero/Box/Research/NJSG/Tradeoff_Analysis/V4')
+
+library(dplyr)
+library(tidyr)
+
+#import data ####
+S3_OB <- read.csv('./data/BaselineData/OB_MOD4_Produced/FromGIS/ClusterInfo/S3_Cluster1_gispin.csv')
+S4_OB <- read.csv('./data/BaselineData/OB_MOD4_Produced/FromGIS/ClusterInfo/S4_ClusterBay_gispin.csv')
+
+S1_OB <- read.csv('data/BaselineData/FirstStreet/OB_FirstStreetData.csv') #licensed parcel level First street data, clipped to MOD-IV residential parcels in GIS
+
+
+#Examining Missing data ####
+
+table(is.na(S1_OB$aal_2021_h)) #1000 #
+table(is.na(S1_OB$aal_2021_m)) #13 #
+table(is.na(S1_OB$aal_2021_l)) #1000 
+
+table(is.na(S1_OB$aal_2051_h)) #364
+table(is.na(S1_OB$aal_2051_m)) #13
+table(is.na(S1_OB$aal_2051_l)) #364
+
+summary(S1_OB$aalUSD_2051_mid)
+
+
+#assigning median AVM to missing AVM####
+table(is.na(S1_OB$avm))
+summary(S1_OB$avm) #401347 = median
+S1_OB$avm[is.na(S1_OB$avm)] <- 401347
+
+
+#calculating 2021 & 2051 values per FS guidance - personal communication and guidance####
+#First Street Guidance: https://help.firststreet.org/hc/en-us/articles/6016946455831-Average-Annual-Loss-AAL-Data
+
+#S1 Calculating AALs ####
+names(S1_OB)
+
+##S1 Low Climate Scenario ####
+S1_OB$aalUSD_2021_low <- ((S1_OB$aal_2021_l*S1_OB$avm)*0.70) # we multiply by 0.7 per First street to obtain the true average market value 
+summary(S1_OB$aalUSD_2021_low) #median = 6457
+range(S1_OB$aalUSD_2021_low, na.rm=T)
+hist(S1_OB$aalUSD_2021_low)
+S1_Known2021AAL_Low <- sum(S1_OB$aalUSD_2021_low, na.rm=T) #7654218
+
+names(S1_OB)
+S1_OB$aalUSD_2051_low <- ((S1_OB$aal_2051_l*S1_OB$avm)*0.70)
+range(S1_OB$aalUSD_2051_low)
+hist(S1_OB$aalUSD_2051_low)
+S1_Known2051AAL_Low <- sum(S1_OB$aalUSD_2051_low, na.rm=T) #11447111
+
+
+##S1 Mid Climate Scenario ####
+S1_OB$aalUSD_2021_mid <- ((S1_OB$aal_2021_m*S1_OB$avm)*0.70)
+range(S1_OB$aalUSD_2021_mid)
+hist(S1_OB$aalUSD_2021_mid)
+S1_Known2021AAL_Mid <- sum(S1_OB$aalUSD_2021_mid, na.rm=T) #7906273
+
+
+S1_OB$aalUSD_2051_mid <- ((S1_OB$aal_2051_m*S1_OB$avm)*0.70)
+range(S1_OB$aalUSD_2051_mid)
+hist(S1_OB$aalUSD_2051_mid)
+S1_Known2051AAL_Mid <- sum(S1_OB$aalUSD_2051_mid, na.rm=T) #13953576
+
+
+
+##S1 High Climate Scenario ####
+
+S1_OB$aalUSD_2021_high <- ((S1_OB$aal_2021_h*S1_OB$avm)*0.70)
+range(S1_OB$aalUSD_2021_high)
+hist(S1_OB$aalUSD_2021_high)
+S1_Known2021AAL_High <- sum(S1_OB$aalUSD_2021_high, na.rm=T) #8206059
+
+
+S1_OB$aalUSD_2051_high <- ((S1_OB$aal_2051_h*S1_OB$avm)*0.70)
+range(S1_OB$aalUSD_2051_high)
+hist(S1_OB$aalUSD_2051_high)
+S1_Known2051AAL_High <- sum(S1_OB$aalUSD_2051_high, na.rm=T) #16665310
+
+
+
+##S1 creating data.frame with AALs ####
+S1_AAL <- data.frame(
+  year = c(2021, 2051),
+  S1_KnownTotalAAL_Low = c(S1_Known2021AAL_Low, S1_Known2051AAL_Low),
+  S1_KnownTotalAAL_Mid = c(S1_Known2021AAL_Mid, S1_Known2051AAL_Mid),
+  S1_KnownTotalAAL_High = c(S1_Known2021AAL_High, S1_Known2051AAL_High)
+)
+
+#Reducing Columns####
+names(S1_OB)
+
+S1_OB <- S1_OB[,c("GIS_PIN","fsid","long","lat",
+              "avm",
+              "aalUSD_2051_low",
+              "aalUSD_2021_low",
+              "aalUSD_2051_mid",
+              "aalUSD_2021_mid",
+              "aalUSD_2051_high",
+              "aalUSD_2021_high")]
+
+
+#Scenario 3: Cluster 1####
+
+#joining AAL data to subset of parcels in the S3 cluster
+names(S3_OB)[names(S3_OB)=="gis_pin"] <- "GIS_PIN"
+S3_OB <- left_join(S3_OB, S1_OB, by="GIS_PIN", copy=F)
+
+#checking
+table(is.na(S3_OB$aalUSD_2021_low)) #384
+table(is.na(S3_OB$aalUSD_2051_low)) #200
+table(is.na(S3_OB$aalUSD_2021_mid)) #3
+table(is.na(S3_OB$aalUSD_2051_mid)) #3
+table(is.na(S3_OB$aalUSD_2021_high)) #384
+table(is.na(S3_OB$aalUSD_2051_high)) #200
+
+
+sum(S3_OB$avm, na.rm=T) #185,524,157
+sum(S3_OB$aalUSD_2021_mid, na.rm = T) #5161.866
+sum(S3_OB$aalUSD_2051_mid, na.rm = T) #179224.2
+
+
+##S3 Low Climate Scenario ####
+S3_Known2021AAL_Low <- sum(S3_OB$aalUSD_2021_low, na.rm=T) #2873.974
+S3_Known2051AAL_Low <- sum(S3_OB$aalUSD_2051_low, na.rm=T) #53829.2
+
+
+##S3 Mid Climate Scenario ####
+S3_Known2021AAL_Mid <- sum(S3_OB$aalUSD_2021_mid, na.rm=T) #5161.866
+S3_Known2051AAL_Mid <- sum(S3_OB$aalUSD_2051_mid, na.rm=T) #179224.2
+
+
+
+##S3 High Climate Scenario ####
+S3_Known2021AAL_High <- sum(S3_OB$aalUSD_2021_high, na.rm=T) #8304.223
+S3_Known2051AAL_High <- sum(S3_OB$aalUSD_2051_high, na.rm=T) #383838.9
+
+## S3 creating data.frame with AALs by scenario ####
+S3_AAL <- data.frame(
+  year = c(2021, 2051),
+  S3_KnownTotalAAL_Low = c(S3_Known2021AAL_Low, S3_Known2051AAL_Low),
+  S3_KnownTotalAAL_Mid = c(S3_Known2021AAL_Mid, S3_Known2051AAL_Mid),
+  S3_KnownTotalAAL_High = c(S3_Known2021AAL_High, S3_Known2051AAL_High)
+)
+
+
+
+#Scenario 4: Cluster Bayside####
+
+#joining AAL data to subset of parcels in the S4 cluster
+names(S4_OB)[names(S4_OB)=="gis_pin"] <- "GIS_PIN"
+S4_OB <- left_join(S4_OB, S1_OB, by="GIS_PIN", copy=F)
+
+#checking
+table(is.na(S4_OB$aalUSD_2021_low)) #384
+table(is.na(S4_OB$aalUSD_2051_low)) #200
+table(is.na(S4_OB$aalUSD_2021_mid)) #3
+table(is.na(S4_OB$aalUSD_2051_mid)) #3
+table(is.na(S4_OB$aalUSD_2021_high)) #384
+table(is.na(S4_OB$aalUSD_2051_high)) #200
+
+
+sum(S4_OB$avm, na.rm=T) #185,524,157
+sum(S4_OB$aalUSD_2021_mid, na.rm = T) #5161.866
+sum(S4_OB$aalUSD_2051_mid, na.rm = T) #179224.2
+
+
+##S4 Low Climate Scenario ####
+S4_Known2021AAL_Low <- sum(S4_OB$aalUSD_2021_low, na.rm=T) #2873.974
+S4_Known2051AAL_Low <- sum(S4_OB$aalUSD_2051_low, na.rm=T) #53829.2
+
+
+##S4 Mid Climate Scenario ####
+S4_Known2021AAL_Mid <- sum(S4_OB$aalUSD_2021_mid, na.rm=T) #5161.866
+S4_Known2051AAL_Mid <- sum(S4_OB$aalUSD_2051_mid, na.rm=T) #179224.2
+
+
+
+##S4 High Climate Scenario ####
+S4_Known2021AAL_High <- sum(S4_OB$aalUSD_2021_high, na.rm=T) #8304.223
+S4_Known2051AAL_High <- sum(S4_OB$aalUSD_2051_high, na.rm=T) #383838.9
+
+
+
+## S4 creating data.frame with AALs by scenario ####
+S4_AAL <- data.frame(
+  year = c(2021, 2051),
+  S4_KnownTotalAAL_Low = c(S4_Known2021AAL_Low, S4_Known2051AAL_Low),
+  S4_KnownTotalAAL_Mid = c(S4_Known2021AAL_Mid, S4_Known2051AAL_Mid),
+  S4_KnownTotalAAL_High = c(S4_Known2021AAL_High, S4_Known2051AAL_High)
+)
+
+
+
+#writing out relevant files####
+path1 <- './data/BaselineData/FirstStreet/'
+write.csv(OB2, file.path(path1, "OB_AAL_byScenario.csv"), row.names=TRUE)

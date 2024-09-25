@@ -1,0 +1,262 @@
+---
+title: "OB_AAL_Estimates"
+author: "Laura Geronimo"
+date: "2024-09-17"
+output: html_document
+---
+
+
+The purpose of this worksheet is to estimate Beach Nourishment costs for Scenarios with properties remaining on the island, based on historical analysis of Beach nourishment investments (see Appendix C). We build three estimates:
+
+1) Beach nourishment is cyclical every 4 years with fixed costs, per historical record, except the initial beach fill events from 2017 and 2019
+2) Beach nourishment costs increase by a factor of 5
+3) Beach nourishment is cyclical. After initial fill, Sand maintenance costs double every 4 years (exponential growth by a factor of 2)
+
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+#Importing data
+```{r include= FALSE}
+#setup
+getwd()
+setwd('C:/Users/lgero/Box/Research/NJSG/Tradeoff_Analysis/V4')
+
+library(dplyr)
+library(tidyr)
+
+#import data ####
+Beach <- read.csv('./data/BaselineData/BeachNourishment/OrtleyBeach_BeachNourishment.csv')
+
+
+```
+
+
+#Approach V1: Beach nourishment is cyclical with fixed costs, per historical record, except the initial beach fill events from 2017 and 2019
+```{r include = FALSE}
+#total beach nourishment costs
+Beach[is.na(Beach)] <- 0
+Beach$TotalCost_adj_V1 <- Beach$LocalCost_Adj + Beach$FedStatCostShare_adj
+
+#reducing to total costs
+Beach <- Beach %>%
+  select(Year, TotalCost_adj_V1)
+
+# Create a new sequence of years from 2023 to 2062
+years_extended <- 2023:2062
+
+# Copy the existing dataframe into an extended dataframe
+Beach_Projected <- data.frame(
+  Year = c(Beach$Year, years_extended),
+  TotalCost_adj_V1 = c(Beach$TotalCost_adj_V1, rep(NA, length(years_extended)))  # Placeholder for new years
+)
+
+# Assign values for 2021 and 2022 to be repeated every 4 years
+# Get the values for 2021 and 2022
+TotalCost_adj_2021 <- Beach[Beach$Year == 2021, "TotalCost_adj_V1"]
+TotalCost_adj_2022 <- Beach[Beach$Year == 2022, "TotalCost_adj_V1"]
+
+# Replace NAs in df_extended for years 2023 to 2062, starting cycles every 4 years
+for (i in seq(2025, 2062, by = 4)) {
+  Beach_Projected[Beach_Projected$Year == i, "TotalCost_adj_V1"] <- TotalCost_adj_2021
+  Beach_Projected[Beach_Projected$Year == i + 1, "TotalCost_adj_V1"] <- TotalCost_adj_2022
+}
+
+# Print the extended dataframe
+print(Beach_Projected)
+```
+
+
+#Approach V2: Beach nourishment costs increase by 100,000 each maintenance episode, from the base 2021 and 2022 events (linear growth by 100,000)
+```{r include = FALSE}
+# Initialize the new column with NA
+Beach_Projected$TotalCost_adj_V2 <- NA
+
+# Copy values from 2017 to 2022 from TotalCost_adj_V1 to TotalCost_adj_V2
+Beach_Projected$TotalCost_adj_V2[Beach_Projected$Year %in% 2017:2022] <- 
+  Beach_Projected$TotalCost_adj_V1[Beach_Projected$Year %in% 2017:2022]
+
+# Identify the 2021 and 2022 values
+cost_2021 <- Beach_Projected$TotalCost_adj_V1[Beach_Projected$Year == 2021]
+cost_2022 <- Beach_Projected$TotalCost_adj_V1[Beach_Projected$Year == 2022]
+
+# Apply the logic to increase costs by 100,000 every 4 years starting from 2021
+for (year in seq(2025, 2062, by = 4)) {
+  # Increase the cost by 100,000 from 4 years prior
+  Beach_Projected$TotalCost_adj_V2[Beach_Projected$Year == year] <- 
+    Beach_Projected$TotalCost_adj_V2[Beach_Projected$Year == year - 4] + 100000
+}
+
+# Apply the logic to increase costs by 100,000 every 4 years starting from 2022
+for (year in seq(2026, 2062, by = 4)) {
+  # Increase the cost by 100,000 from 4 years prior
+  Beach_Projected$TotalCost_adj_V2[Beach_Projected$Year == year] <- 
+    Beach_Projected$TotalCost_adj_V2[Beach_Projected$Year == year - 4] + 100000
+}
+
+# Print the extended dataframe
+print(Beach_Projected)
+
+```
+
+
+
+#Approach V3: Beach nourishment is cyclical. After initial fill, Sand maintenance costs increase by 50% every 4 years (exponential growth by a factor of 1.5)
+```{r include = FALSE}
+# Initialize the new column with NA
+Beach_Projected$TotalCost_adj_V3 <- NA
+
+# Copy values from 2017 to 2022 from TotalCost_adj_V1 to TotalCost_adj_V3
+Beach_Projected$TotalCost_adj_V3[Beach_Projected$Year %in% 2017:2022] <- 
+  Beach_Projected$TotalCost_adj_V1[Beach_Projected$Year %in% 2017:2022]
+
+#Identify the 2021 and 2022 values
+cost_2021 <- Beach_Projected$TotalCost_adj_V1[Beach_Projected$Year == 2021]
+cost_2022 <- Beach_Projected$TotalCost_adj_V1[Beach_Projected$Year == 2022]
+
+# Apply the logic to increase the costs by a factor of 1.5 4 years starting from 2021
+for (year in seq(2025, 2062, by = 4)) {
+  # Double the cost from 4 years prior
+  Beach_Projected$TotalCost_adj_V3[Beach_Projected$Year == year] <- 
+    Beach_Projected$TotalCost_adj_V3[Beach_Projected$Year == year - 4] * 1.5
+}
+
+# Apply the logic to increase the costs by a factor of 1.5 every 4 years starting from 2022
+for (year in seq(2026, 2062, by = 4)) {
+  # Double the cost from 4 years prior
+  Beach_Projected$TotalCost_adj_V3[Beach_Projected$Year == year] <- 
+    Beach_Projected$TotalCost_adj_V3[Beach_Projected$Year == year - 4] * 1.5
+}
+
+# Print the extended dataframe
+print(Beach_Projected)
+
+
+```
+
+#QC the trends
+```{R include=FALSE}
+#QC
+plot(Beach_Projected$Year, Beach_Projected$TotalCost_adj_V1)
+plot(Beach_Projected$Year, Beach_Projected$TotalCost_adj_V2)
+plot(Beach_Projected$Year, Beach_Projected$TotalCost_adj_V3)
+
+```
+
+# Discounting 
+## Defining function to discount values at 2 percent
+```{r include = FALSE}
+discount_2pct <- function(df, discount_rate = 0.02, base_year = 2012) {
+  # Ensure discount factors are calculated for every year in the dataframe
+  discount_factors <- 1 / ((1 + discount_rate) ^ (df$Year - base_year))
+  
+  # Apply the discount factor to the interpolated AAL values
+  df$TotalCost_adj_V1_dis2pct <- df$TotalCost_adj_V1 * discount_factors
+  df$TotalCost_adj_V2_dis2pct <- df$TotalCost_adj_V2 * discount_factors
+  df$TotalCost_adj_V3_dis2pct <- df$TotalCost_adj_V3 * discount_factors
+
+  
+  # Return the dataframe with discounted values
+  return(df)
+}
+
+```
+
+## Defining function to discount values at 3 percent
+```{r include = FALSE}
+discount_3pct <- function(df, discount_rate = 0.03, base_year = 2012) {
+  # Ensure discount factors are calculated for every year in the dataframe
+  discount_factors <- 1 / ((1 + discount_rate) ^ (df$Year - base_year))
+  
+  # Apply the discount factor to the interpolated AAL values
+  df$TotalCost_adj_V1_dis3pct <- df$TotalCost_adj_V1 * discount_factors
+  df$TotalCost_adj_V2_dis3pct <- df$TotalCost_adj_V2 * discount_factors
+  df$TotalCost_adj_V3_dis3pct <- df$TotalCost_adj_V3 * discount_factors
+
+  
+  # Return the dataframe with discounted values
+  return(df)
+}
+
+```
+
+
+## Defining function to discount values at 7 percent
+```{r include = FALSE}
+discount_7pct <- function(df, discount_rate = 0.07, base_year = 2012) {
+  # Ensure discount factors are calculated for every year in the dataframe
+  discount_factors <- 1 / ((1 + discount_rate) ^ (df$Year - base_year))
+  
+  # Apply the discount factor to the interpolated AAL values
+  df$TotalCost_adj_V1_dis7pct <- df$TotalCost_adj_V1 * discount_factors
+  df$TotalCost_adj_V2_dis7pct <- df$TotalCost_adj_V2 * discount_factors
+  df$TotalCost_adj_V3_dis7pct <- df$TotalCost_adj_V3 * discount_factors
+
+  
+  # Return the dataframe with discounted values
+  return(df)
+}
+
+```
+
+### Discounting  at 2% by scenario
+```{r include = FALSE}
+
+Beach_Projected <- discount_2pct(Beach_Projected)
+Beach_Projected <- discount_3pct(Beach_Projected)
+Beach_Projected <- discount_7pct(Beach_Projected)
+
+```
+
+
+#Obtaining NPVs based on assumptions and discount rates
+```{r include = FALSE}
+
+#V1
+NPV_ProtectCost_V1_dis2pct <- sum(Beach_Projected$TotalCost_adj_V1_dis2pct[Beach_Projected$Year %in% 2023:2062], na.rm=T)
+
+NPV_ProtectCost_V1_dis3pct <- sum(Beach_Projected$TotalCost_adj_V1_dis3pct[Beach_Projected$Year %in% 2023:2062], na.rm=T)
+
+NPV_ProtectCost_V1_dis7pct <- sum(Beach_Projected$TotalCost_adj_V1_dis7pct[Beach_Projected$Year %in% 2023:2062], na.rm=T)
+
+#V2
+NPV_ProtectCost_V2_dis2pct <- sum(Beach_Projected$TotalCost_adj_V2_dis2pct[Beach_Projected$Year %in% 2023:2062], na.rm=T)
+
+NPV_ProtectCost_V2_dis3pct <- sum(Beach_Projected$TotalCost_adj_V2_dis3pct[Beach_Projected$Year %in% 2023:2062], na.rm=T)
+
+NPV_ProtectCost_V2_dis7pct <- sum(Beach_Projected$TotalCost_adj_V2_dis7pct[Beach_Projected$Year %in% 2023:2062], na.rm=T)
+
+#V3
+NPV_ProtectCost_V3_dis2pct <- sum(Beach_Projected$TotalCost_adj_V3_dis2pct[Beach_Projected$Year %in% 2023:2062], na.rm=T)
+
+NPV_ProtectCost_V3_dis3pct <- sum(Beach_Projected$TotalCost_adj_V3_dis3pct[Beach_Projected$Year %in% 2023:2062], na.rm=T)
+
+NPV_ProtectCost_V3_dis7pct <- sum(Beach_Projected$TotalCost_adj_V3_dis7pct[Beach_Projected$Year %in% 2023:2062], na.rm=T)
+
+# Create a new dataframe with the desired structure
+NPV_ProtectionCost <- data.frame(
+  Scenario = c("V1", "V2", "V3"),
+  dis2pct = c(NPV_ProtectCost_V1_dis2pct, 
+              NPV_ProtectCost_V2_dis2pct, 
+              NPV_ProtectCost_V3_dis2pct),
+  dis3pct = c(NPV_ProtectCost_V1_dis3pct, 
+              NPV_ProtectCost_V2_dis3pct,
+              NPV_ProtectCost_V3_dis2pct),
+  dis7pct = c(NPV_ProtectCost_V1_dis7pct, 
+              NPV_ProtectCost_V2_dis7pct,
+              NPV_ProtectCost_V3_dis7pct))
+
+# View the dataframe
+print(NPV_ProtectionCost)
+```
+
+
+#writing out files
+```{r include= FALSE}
+path <- './data/BaselineData/BeachNourishment'
+
+write.csv(NPV_ProtectionCost, file.path(path, "NPV_ProtectionCost.csv"), row.names = FALSE)
+
+```

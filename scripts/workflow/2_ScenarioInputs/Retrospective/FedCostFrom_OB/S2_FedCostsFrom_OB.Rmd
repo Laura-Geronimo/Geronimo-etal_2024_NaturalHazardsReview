@@ -1,0 +1,291 @@
+---
+title: "S2_FedCostsFrom_OB"
+author: "Laura Geronimo"
+date: "2024-09-13"
+output: html_document
+---
+The purpose of this worksheet is to estimate the NPV for costs to the Federal Government for Scenario 2. We discount the costs and group them into buckets for analysis.
+
+We discount at 2%, 3%, and 7% based on justifications provided in the SI.
+
+Assumptions:
+-Federal Cost Share for Municipal Response and Recovery (essential only for 2012 and 2013)
+    -PA Debris Removal (2012, 2013)
+    -PA Protective measures (2012, 2013)
+    -Repairs to Route 37 (2012, 2013)
+-Federal cost share for response and recovery direct to household (NA: redirected to buyouts)
+-Federal IA / NFIP claims (NA: redirected to buyouts)
+-Federal cost share for beach nourishment (NA)
+
+-Federal cost share for buyouts = 75% of market price for all homes
+
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+#Importing data
+```{r include=FALSE}
+
+getwd()
+setwd('C:/Users/lgero/Box/Research/NJSG/Tradeoff_Analysis/V4')
+
+#libraries ####
+library(tidyverse)
+library(networkD3)
+library(dplyr)
+library(data.table)
+library(stringr)
+library(readxl)
+library(purrr)
+
+options(scipen=999)
+
+
+##Importing Data ####
+FedCostOB <- read.csv('./data/BaselineData/S1_OB_Inputs/Costs_ToFed_fromOB/FedCostOB.csv')
+FedCostOB <- FedCostOB[,c(-1)]
+
+#for buyout cost estimates
+OB_2011_SP <- read.csv('./data/BaselineData/OB_MOD4_Produced/TimeSeries/S1/OB_2011_SalesPrice.csv')
+Adjust <- read.csv('./data/BaselineData/InflationAdjusters.csv')
+
+```
+
+#Adjusting basline data per simplifying assumptions for S2
+# Retaining essential response and recovery costs from federal government, and reducing to 2012 / 2013
+```{r include = FALSE}
+#retaining essential lines
+S2_FedCostOB <- FedCostOB %>%
+  select(Year,
+         OB_FedShare_PA_Debris_adj,
+         OB_FedShare_PA_Protect_adj,
+         OB_FedShare_DOT_Rt37_adj)
+
+#reducing to 2012 & 2013 only
+S2_FedCostOB$OB_FedShare_PA_Debris_adj[S2_FedCostOB$Year > 2013] <- NA
+S2_FedCostOB$OB_FedShare_PA_Protect_adj[S2_FedCostOB$Year > 2013] <- NA
+S2_FedCostOB$OB_FedShare_DOT_Rt37_adj[S2_FedCostOB$Year > 2013] <- NA
+
+```
+
+
+# Calculating Federal cost share for Buyouts (75 % of market price)
+```{r include= FALSE}
+#subset estimated sales price to the winzorized estimates
+OB_2011_SP <- OB_2011_SP[,c("SalesPrice_LG_W")]
+
+#obtain total sales price value in Ortley Beach
+OB_2011_SP_Tot <- sum(OB_2011_SP)
+
+
+#adjusting by CPI to 2020 USD
+y11_CPI_multiplier <- Adjust$CPI_Multiplier_USD2020[Adjust$Year==2011]
+
+OB_2011_SP_Tot_adj <- OB_2011_SP_Tot * y11_CPI_multiplier
+
+#obtaining Federal share of buyout cost (75% cost share)
+OB_FedShare_BuyoutCost_adj <- OB_2011_SP_Tot_adj * 0.75
+
+#Adding buyout costs to data frame 
+S2_FedCostOB$OB_FedShare_BuyoutCost_adj[S2_FedCostOB$Year==2012] <- OB_FedShare_BuyoutCost_adj
+```
+
+
+#Discounting values to 2%, summing to NPV, and grouping in buckets
+```{r include=FALSE}
+
+###discounting flows at 2% ####
+#Creating a year index 
+S2_FedCostOB$YearIndex <- 0:10
+
+#Define the function for discounting flows by 2% 
+dis2pct <- function(df, amount_cols, year_index_col, discount_rate = 0.02, base_year = 0) {
+  for (col in amount_cols) {
+    discounted_col_name <- paste0(col, "_dis2pct")
+    df[[discounted_col_name]] <- df[[col]] / ((1 + discount_rate) ^ (df[[year_index_col]] - base_year))
+  }
+  return(df)
+}
+
+# List of columns to discount - select colums starting with OB 
+amount_cols <-  grep("^OB_", colnames(S2_FedCostOB), value = TRUE)
+
+# Apply the discount function
+S2_FedCostOB_dis2pct <- dis2pct(S2_FedCostOB, amount_cols, year_index_col = "YearIndex")
+
+# Remove undiscounted columns
+S2_FedCostOB_dis2pct <- S2_FedCostOB_dis2pct %>%
+  select(Year, YearIndex, ends_with("_dis2pct"))
+
+###Summing to NPV ####
+#Create a new data frame that sums the discounted columns for NPV (2020USD)
+S2_FedCostOB_dis2pct_NPV <- S2_FedCostOB_dis2pct %>%
+  summarise(across(ends_with("_dis2pct"), sum, na.rm = TRUE))
+
+###creating buckets ####
+#Summing Fed Share for Response and Recovery Direct to Municipal Government
+S2_FedCostOB_dis2pct_NPV <- S2_FedCostOB_dis2pct_NPV %>%
+  mutate(OB_FedShare_ToTR_ResponseRecovery_dis2pct= 
+           OB_FedShare_PA_Debris_adj_dis2pct+
+           OB_FedShare_PA_Protect_adj_dis2pct)
+
+
+#selecting variables
+S2_FedCostOB_dis2pct_NPV <- S2_FedCostOB_dis2pct_NPV %>%
+  select(OB_FedShare_ToTR_ResponseRecovery_dis2pct,
+         OB_FedShare_DOT_Rt37_adj_dis2pct,
+         OB_FedShare_BuyoutCost_adj_dis2pct)
+
+#pivoting tables longer
+S2_FedCostOB_dis2pct_NPV <- S2_FedCostOB_dis2pct_NPV %>%
+  pivot_longer(
+    cols = everything(),      # Pivot all columns
+    names_to = "variable",     # New column with variable names
+    values_to = "dis2pct"      # New column with the values
+  ) %>%
+  mutate(variable = sub("_dis2pct", "", variable)) 
+```
+
+
+#Discounting values to 3%, summing to NPV, and grouping in buckets
+```{r include=FALSE}
+
+###discounting flows at 3% ####
+#Creating a year index 
+S2_FedCostOB$YearIndex <- 0:10
+
+#Define the function for discounting flows by 3% 
+dis3pct <- function(df, amount_cols, year_index_col, discount_rate = 0.03, base_year = 0) {
+  for (col in amount_cols) {
+    discounted_col_name <- paste0(col, "_dis3pct")
+    df[[discounted_col_name]] <- df[[col]] / ((1 + discount_rate) ^ (df[[year_index_col]] - base_year))
+  }
+  return(df)
+}
+
+# List of columns to discount - select colums starting with OB 
+amount_cols <-  grep("^OB_", colnames(S2_FedCostOB), value = TRUE)
+
+# Apply the discount function
+S2_FedCostOB_dis3pct <- dis3pct(S2_FedCostOB, amount_cols, year_index_col = "YearIndex")
+
+# Remove undiscounted columns
+S2_FedCostOB_dis3pct <- S2_FedCostOB_dis3pct %>%
+  select(Year, YearIndex, ends_with("_dis3pct"))
+
+###Summing to NPV ####
+#Create a new data frame that sums the discounted columns for NPV (2020USD)
+S2_FedCostOB_dis3pct_NPV <- S2_FedCostOB_dis3pct %>%
+  summarise(across(ends_with("_dis3pct"), sum, na.rm = TRUE))
+
+###creating buckets ####
+#Summing Fed Share for Response and Recovery Direct to Municipal Government
+S2_FedCostOB_dis3pct_NPV <- S2_FedCostOB_dis3pct_NPV %>%
+  mutate(OB_FedShare_ToTR_ResponseRecovery_dis3pct= 
+           OB_FedShare_PA_Debris_adj_dis3pct+
+           OB_FedShare_PA_Protect_adj_dis3pct)
+
+
+#selecting variables
+S2_FedCostOB_dis3pct_NPV <- S2_FedCostOB_dis3pct_NPV %>%
+  select(OB_FedShare_ToTR_ResponseRecovery_dis3pct,
+         OB_FedShare_DOT_Rt37_adj_dis3pct,
+         OB_FedShare_BuyoutCost_adj_dis3pct)
+
+#pivoting tables longer
+S2_FedCostOB_dis3pct_NPV <- S2_FedCostOB_dis3pct_NPV %>%
+  pivot_longer(
+    cols = everything(),      # Pivot all columns
+    names_to = "variable",     # New column with variable names
+    values_to = "dis3pct"      # New column with the values
+  ) %>%
+  mutate(variable = sub("_dis3pct", "", variable)) 
+```
+
+
+#Discounting values to 7%, summing to NPV, and grouping in buckets
+```{r include=FALSE}
+
+###discounting flows at 7% ####
+#Creating a year index 
+S2_FedCostOB$YearIndex <- 0:10
+
+#Define the function for discounting flows by 7% 
+dis7pct <- function(df, amount_cols, year_index_col, discount_rate = 0.07, base_year = 0) {
+  for (col in amount_cols) {
+    discounted_col_name <- paste0(col, "_dis7pct")
+    df[[discounted_col_name]] <- df[[col]] / ((1 + discount_rate) ^ (df[[year_index_col]] - base_year))
+  }
+  return(df)
+}
+
+# List of columns to discount - select colums starting with OB 
+amount_cols <-  grep("^OB_", colnames(S2_FedCostOB), value = TRUE)
+
+# Apply the discount function
+S2_FedCostOB_dis7pct <- dis7pct(S2_FedCostOB, amount_cols, year_index_col = "YearIndex")
+
+# Remove undiscounted columns
+S2_FedCostOB_dis7pct <- S2_FedCostOB_dis7pct %>%
+  select(Year, YearIndex, ends_with("_dis7pct"))
+
+###Summing to NPV ####
+#Create a new data frame that sums the discounted columns for NPV (2020USD)
+S2_FedCostOB_dis7pct_NPV <- S2_FedCostOB_dis7pct %>%
+  summarise(across(ends_with("_dis7pct"), sum, na.rm = TRUE))
+
+###creating buckets ####
+#Summing Fed Share for Response and Recovery Direct to Municipal Government
+S2_FedCostOB_dis7pct_NPV <- S2_FedCostOB_dis7pct_NPV %>%
+  mutate(OB_FedShare_ToTR_ResponseRecovery_dis7pct= 
+           OB_FedShare_PA_Debris_adj_dis7pct+
+           OB_FedShare_PA_Protect_adj_dis7pct)
+
+
+#selecting variables
+S2_FedCostOB_dis7pct_NPV <- S2_FedCostOB_dis7pct_NPV %>%
+  select(OB_FedShare_ToTR_ResponseRecovery_dis7pct,
+         OB_FedShare_DOT_Rt37_adj_dis7pct,
+         OB_FedShare_BuyoutCost_adj_dis7pct)
+
+#pivoting tables longer
+S2_FedCostOB_dis7pct_NPV <- S2_FedCostOB_dis7pct_NPV %>%
+  pivot_longer(
+    cols = everything(),      # Pivot all columns
+    names_to = "variable",     # New column with variable names
+    values_to = "dis7pct"      # New column with the values
+  ) %>%
+  mutate(variable = sub("_dis7pct", "", variable)) 
+```
+
+
+#Joining data for export
+```{r include = FALSE}
+#pivoting tables longer
+S2_FedCostOB_NPV <- S2_FedCostOB_dis2pct_NPV %>%
+  left_join(S2_FedCostOB_dis3pct_NPV, by = "variable") %>%
+  left_join(S2_FedCostOB_dis7pct_NPV, by = "variable")
+
+```
+
+#Writing out discounted NPV files
+```{r include= FALSE}
+path <- './data/BaselineData/S2_OB_Inputs'
+
+write.csv(S2_FedCostOB_NPV, file.path(path, "S2_FedCostOB_NPV.csv"), row.names = TRUE)
+
+```
+
+#QC
+```{r include= FALSE}
+S2_FedCostOB_dis2pct_NPV <- sum(S2_FedCostOB_NPV$dis2pct)
+S2_FedCostOB_dis3pct_NPV <- sum(S2_FedCostOB_NPV$dis3pct)
+S2_FedCostOB_dis7pct_NPV <- sum(S2_FedCostOB_NPV$dis7pct)
+
+S2_FedCostOB_dis2pct_NPV
+S2_FedCostOB_dis3pct_NPV
+S2_FedCostOB_dis7pct_NPV
+```

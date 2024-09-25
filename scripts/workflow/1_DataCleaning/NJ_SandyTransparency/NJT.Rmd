@@ -1,0 +1,63 @@
+---
+title: "NJST: NJT Program Overview"
+author: "Laura Geronimo"
+date: '2024-08-23'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r include=FALSE}
+
+getwd()
+setwd('C:/Users/lgero/Box/Research/NJSG/Tradeoff_Analysis/V4')
+
+#libraries ####
+library(tidyverse)
+library(networkD3)
+library(dplyr)
+library(data.table)
+library(stringr)
+
+options(scipen=999)
+
+##Importing Data
+NJT <- read.csv('./data/DataDownloads/NJ_SandyTransparencyData/State_Agency_Datasets/Sandy_NJ_Transit_Master_Data.csv')
+
+## Explore####
+colSums(is.na(NJT))
+table(NJT$Project)
+
+#Workflow:
+#########PART 1: Data subset and processing: CPI Adjustments
+#Subset data to Ocean County
+#Extract Year from a suitable category using library stringr (see example code below)
+#create dataframe for CPI Adjustments (year and CPI - see sample code)
+#join to your Ocean County dataframe by year (this will integrate CPI multipliers into Ocean county dataframe)
+#Create a new variable that reflects adjusted federal cost share (choose suitable variable like federal.distributed.amount, multiply the by the CPI value, and append 'Adj' to variable name --see sample code). Keep track of what values you use by using similar naming convention. (e.g. federal.distributed.amount.adj)
+#Create a new variable that reflects adjusted local cost share (choose suitable variable like local.share, multiply the by the CPI value, and append 'Adj' to variable name --see sample code). 
+#Spot check your dataframe to make sure that calculations completed
+
+#########PART 2: Redo links with CPI adjusted values. PA cumulative cost share by municipality (local and federal) by project type in Ocean County
+    #A. how much PA assistance (Federal Share Adj) went to each municipality by project type
+    #B. How much PA assistance (Local Share Adj)  went to each municipality by project type
+
+#########PART 3: Obtain generalized costs by unit using assumptions- WORKING on Method
+#Note that I am still working on the methodology for select projects
+#Subset to Countywide and Toms River to start
+#for Toms River, if the project is related to buildings, divide by 9651 (estimate of residential properties affected by Sandy storm surge)
+#for Toms River, if the project is related to roads, divide by 134 (estimate of number of miles of roadway affected by Sandy storm surge)
+```
+
+
+### Part 1: Data subset and processing: CPI Adjustments
+```{r, include=FALSE}
+#subset to Ocean County or Toms River (depending on complexity of your data and ease of processing)
+table(is.na(NJT$County))
+table(is.na(NJT$Municipality))
+NJT_Ocean <- subset(NJT, County=="OCEAN")
+NJT_TR <- subset(NJT, Municipality=="TOMS RIVER TOWNSHIP")
+
+#none relevant to Toms River or Ortley Beach

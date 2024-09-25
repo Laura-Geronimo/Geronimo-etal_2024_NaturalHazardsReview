@@ -1,0 +1,34 @@
+---
+title: "DEP Dataset"
+author: "Laura Geronimo"
+date: "2024-08-23"
+output: html_document
+---
+
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r getting started}
+getwd()
+setwd('C:/Users/lgero/Box/Research/NJSG/Tradeoff_Analysis/V4')
+library(tidyverse)
+library(networkD3)
+library(dplyr)
+library(data.table)
+library(stargazer)
+
+DEP <- read_csv("./data/DataDownloads/NJ_SandyTransparencyData/State_Agency_Datasets/Sandy_DEP_Master_Data.csv")
+```
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+#Q1.B: DEP by Project in Ocean County (Federal Share)
+
+
+DEP_Ocean <- subset(DEP, County=="OCEAN")
+DEP_TR <- subset(DEP_Ocean, Municipality=="TOMS RIVER TOWNSHIP")
+
+#note: Related to fisheries only. Not relevant to rebuilding physical infrastructure

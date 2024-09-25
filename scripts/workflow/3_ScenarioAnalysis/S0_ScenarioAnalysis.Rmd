@@ -1,0 +1,438 @@
+---
+title: "ScenarioAnalysis_Retrospective"
+author: "Laura Geronimo"
+date: "2024-09-16"
+output: html_document
+---
+
+In this worksheet we analyse and compare the total costs to society for S0 (no Sandy), using best estimates.
+
+
+Recall the assumptions for S0 applied in prior worksheets:
+
+Assumptions:
+
+Federal policy costs:
+-Federal Cost Share for Municipal Response and Recovery (NA - no Sandy)
+-Federal cost share for response and recovery direct to household (NA - no Sandy)
+-Federal IA / NFIP claims (post 2012 events only)
+-NFIP policies (Assume NFIP policies same as 2012, with 3%  growth rate on par with change in assessed value)
+-Federal cost share for beach nourishment (2021 event only)
+
+Municipal policy costs:
+-Municipal cost share for federal response and recovery (NA - no Sandy)
+-Municipal cost share for beach nourishment (2022 event only)
+
+Residual Risk:
+- Assume 10x as high as First Street estimates, because we assume that homes were not elevated to BFE post-Sandy. Three climate assumptions (low, mid, high)
+
+Protection costs:
+- No initial beach nourishment associated with Sandy
+- Maintenance costs: Test three assumptions (low, mid, high)
+
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+#Importing data
+```{r include=FALSE}
+
+getwd()
+setwd('C:/Users/lgero/Box/Research/NJSG/Tradeoff_Analysis/V4')
+
+#libraries ####
+library(tidyverse)
+library(networkD3)
+library(dplyr)
+library(data.table)
+library(stringr)
+library(readxl)
+library(purrr)
+library(ggplot2)
+library(scales)
+library(knitr)
+library(formattable)
+
+options(scipen=999)
+
+
+##Importing Data ####
+####Retrospective ####
+#S0
+S0_FedCostOB_NPV <- read.csv('./data/BaselineData/S0_OB_Inputs/S0_FedCostOB_NPV.csv')
+S0_FedRevOB_NPV <- read.csv('./data/BaselineData/S0_OB_Inputs/S0_FedRevOB_NPV.csv')
+S0_MuniCostOB_NPV <- read.csv('./data/BaselineData/S0_OB_Inputs/S0_MuniCostOB_NPV.csv')
+S0_MuniRevOB_NPV <- read.csv('./data/BaselineData/S0_OB_Inputs/S0_MuniRevOB_NPV.csv')
+
+
+####Prospective ####
+##### Residual Risk (assume 10x, due to no elevations post Sandy####
+S0_NPV_ResRisk <- read.csv('./data/BaselineData/S0_OB_Inputs/S0_NPV_ResRisk.csv')
+
+##### Protection Costs (test three assumptions about protection costs) ####
+S0_NPV_ProtectCost <- read.csv('./data/BaselineData/BeachNourishment/NPV_ProtectionCost.csv')
+
+
+```
+
+
+#S0: Analysis: 2% discount rate 
+###Total policy costs (Retrospective: 2012-2022)
+```{r inclue= FALSE}
+## Estimating Retrospective Policy Cost for S0 
+#Estimating total Response and recovery cost for households (NA)
+#Estimating total costs to repair roads (NA)
+
+#Estimating total costs for beach nourishment (2021 event only: Muni + Fed)
+S0_BeachRestore_dis2pct <-  S0_FedCostOB_NPV$dis2pct[S0_FedCostOB_NPV$variable=="OB_FedShare_BeachNourish_adj"] +
+  S0_MuniCostOB_NPV$dis2pct[S0_MuniCostOB_NPV$variable=="OB_LocalShare_BeachNourish_adj"]
+
+#Estimating NFIP policy costs
+S0_NFIP_PolicyCost_dis2pct <- S0_FedRevOB_NPV$dis2pct[S0_FedRevOB_NPV$variable=="OB_NFIP_PolicyCost_adj"]
+
+#Estimating NFIP claims (post-Sandy only)
+S0_NFIP_Claims_dis2pct <- S0_FedCostOB_NPV$dis2pct[S0_FedCostOB_NPV$variable=="OB_FedShare_NFIP"]
+
+
+# Create a vector of the object names
+object_names <- c("S0_BeachRestore_dis2pct",
+                  "S0_NFIP_PolicyCost_dis2pct",
+                  "S0_NFIP_Claims_dis2pct")
+
+
+# Use mget to get the values and names
+values <- mget(object_names)
+
+# Convert to a dataframe
+S0_PolicyCost_dis2pct <- data.frame(Label = names(values), Value = unlist(values))
+
+# Print the dataframe
+S0_PolicyCost_dis2pct
+
+# Total Policy cost
+S0_TotalPolicyCost_dis2pct <- sum(S0_PolicyCost_dis2pct$Value)
+```
+
+###Prospective costs (2022:2063)
+####Protection Costs Assumption
+```{r include=FALSE}
+S0_NPV_ProtectCost_V1_dis2pct <- S0_NPV_ProtectCost$dis2pct[S0_NPV_ProtectCost$Scenario=="V1"]
+S0_NPV_ProtectCost_V2_dis2pct <- S0_NPV_ProtectCost$dis2pct[S0_NPV_ProtectCost$Scenario=="V2"]
+S0_NPV_ProtectCost_V3_dis2pct <- S0_NPV_ProtectCost$dis2pct[S0_NPV_ProtectCost$Scenario=="V3"]
+
+```
+
+####Residual Risk Assumption 
+```{r include = FALSE}
+S0_NPV_ResRisk_low_dis2pct <- S0_NPV_ResRisk$dis2pct[S0_NPV_ResRisk$Scenario=="Low"]
+S0_NPV_ResRisk_mid_dis2pct <- S0_NPV_ResRisk$dis2pct[S0_NPV_ResRisk$Scenario=="Medium"]
+S0_NPV_ResRisk_high_dis2pct <- S0_NPV_ResRisk$dis2pct[S0_NPV_ResRisk$Scenario=="High"]
+
+```
+
+###Summary of NPV by Assumptions :
+S0_VLow: Low future costs (low protection costs, low residual risk)
+S0_VMid: Mid future costs (mid protection costs, mid residual risk)
+S0_VMid: Mid future costs (high protection costs, high residual risk)
+
+```{r include= FALSE}
+#Get NPV
+S0_VLow_NPV_dis2pct <- S0_TotalPolicyCost_dis2pct + S0_NPV_ProtectCost_V1_dis2pct + 
+  S0_NPV_ResRisk_low_dis2pct
+
+S0_VMid_NPV_dis2pct <- S0_TotalPolicyCost_dis2pct + S0_NPV_ProtectCost_V2_dis2pct + 
+  S0_NPV_ResRisk_mid_dis2pct
+
+S0_VHigh_NPV_dis2pct <- S0_TotalPolicyCost_dis2pct + S0_NPV_ProtectCost_V3_dis2pct + 
+  S0_NPV_ResRisk_high_dis2pct
+
+```
+
+#### Plot 
+```{r include = FALSE}
+
+# Create a sample data frame with 3 scenarios and 3 values for each
+S0 <- data.frame(
+  Assumption= rep(c("Low", "Mid", "High"), each = 3),
+  CostType = rep(c("Policy Cost", "Residual Risk", "Protection Cost"), times = 3),
+  Cost = c(S0_TotalPolicyCost_dis2pct, 
+           S0_NPV_ResRisk_low_dis2pct, 
+           S0_NPV_ProtectCost_V1_dis2pct, 
+           S0_TotalPolicyCost_dis2pct, 
+           S0_NPV_ResRisk_mid_dis2pct, 
+           S0_NPV_ProtectCost_V2_dis2pct,
+           S0_TotalPolicyCost_dis2pct, 
+           S0_NPV_ResRisk_high_dis2pct, 
+           S0_NPV_ProtectCost_V3_dis2pct)
+)
+
+# Convert 'CostType' to a factor and reorder the levels
+S0$Assumption <- factor(S0$Assumption, levels = c("Low", "Mid", "High"))
+S0$CostType <- factor(S0$CostType, levels = c("Protection Cost", "Residual Risk", "Policy Cost"))
+
+# Plot the stacked bar chart
+ggplot(S0, aes(x = Assumption, y = Cost, fill = CostType)) +
+  geom_bar(stat = "identity") +  # Create a stacked bar chart
+  labs(title = "S0: Cost Analysis by Assumptions \n(2% Discount Rate)", 
+       x = "Assumption", 
+       y = "Cost") +
+  scale_fill_manual(values = c("Policy Cost" = "blue", 
+                               "Residual Risk" = "red", 
+                               "Protection Cost" = "black")) +
+  theme_minimal() +
+  scale_y_continuous(labels = label_dollar(scale = 1e-6, suffix = "M"), limits = c(0, 4000000000)) +
+  labs(y = "Cost in Millions of dollars \n(2020USD)") 
+
+
+```
+
+
+#S0: Analysis: 3% discount rate 
+###Total policy costs (Retrospective: 2012-2022)
+```{r inclue= FALSE}
+## Estimating Retrospective Policy Cost for S0 
+#Estimating total Response and recovery cost for households (NA)
+#Estimating total costs to repair roads (NA)
+
+#Estimating total costs for beach nourishment (2021 event only: Muni + Fed)
+S0_BeachRestore_dis3pct <-  S0_FedCostOB_NPV$dis3pct[S0_FedCostOB_NPV$variable=="OB_FedShare_BeachNourish_adj"] +
+  S0_MuniCostOB_NPV$dis3pct[S0_MuniCostOB_NPV$variable=="OB_LocalShare_BeachNourish_adj"]
+
+#Estimating NFIP policy costs
+S0_NFIP_PolicyCost_dis3pct <- S0_FedRevOB_NPV$dis3pct[S0_FedRevOB_NPV$variable=="OB_NFIP_PolicyCost_adj"]
+
+#Estimating NFIP claims (post-Sandy only)
+S0_NFIP_Claims_dis3pct <- S0_FedCostOB_NPV$dis3pct[S0_FedCostOB_NPV$variable=="OB_FedShare_NFIP"]
+
+
+# Create a vector of the object names
+object_names <- c("S0_BeachRestore_dis3pct",
+                  "S0_NFIP_PolicyCost_dis3pct",
+                  "S0_NFIP_Claims_dis3pct")
+
+
+# Use mget to get the values and names
+values <- mget(object_names)
+
+# Convert to a dataframe
+S0_PolicyCost_dis3pct <- data.frame(Label = names(values), Value = unlist(values))
+
+# Print the dataframe
+S0_PolicyCost_dis3pct
+
+# Total Policy cost
+S0_TotalPolicyCost_dis3pct <- sum(S0_PolicyCost_dis3pct$Value)
+```
+
+###Prospective costs (2022:2063)
+####Protection Costs Assumption
+```{r include=FALSE}
+S0_NPV_ProtectCost_V1_dis3pct <- S0_NPV_ProtectCost$dis3pct[S0_NPV_ProtectCost$Scenario=="V1"]
+S0_NPV_ProtectCost_V2_dis3pct <- S0_NPV_ProtectCost$dis3pct[S0_NPV_ProtectCost$Scenario=="V2"]
+S0_NPV_ProtectCost_V3_dis3pct <- S0_NPV_ProtectCost$dis3pct[S0_NPV_ProtectCost$Scenario=="V3"]
+
+```
+
+####Residual Risk Assumption 
+```{r include = FALSE}
+S0_NPV_ResRisk_low_dis3pct <- S0_NPV_ResRisk$dis3pct[S0_NPV_ResRisk$Scenario=="Low"]
+S0_NPV_ResRisk_mid_dis3pct <- S0_NPV_ResRisk$dis3pct[S0_NPV_ResRisk$Scenario=="Medium"]
+S0_NPV_ResRisk_high_dis3pct <- S0_NPV_ResRisk$dis3pct[S0_NPV_ResRisk$Scenario=="High"]
+
+```
+
+###Summary of NPV by Assumptions :
+S0_VLow: Low future costs (low protection costs, low residual risk)
+S0_VMid: Mid future costs (mid protection costs, mid residual risk)
+S0_VMid: Mid future costs (high protection costs, high residual risk)
+
+```{r include= FALSE}
+#Get NPV
+S0_VLow_NPV_dis3pct <- S0_TotalPolicyCost_dis3pct + S0_NPV_ProtectCost_V1_dis3pct + 
+  S0_NPV_ResRisk_low_dis3pct
+
+S0_VMid_NPV_dis3pct <- S0_TotalPolicyCost_dis3pct + S0_NPV_ProtectCost_V2_dis3pct + 
+  S0_NPV_ResRisk_mid_dis3pct
+
+S0_VHigh_NPV_dis3pct <- S0_TotalPolicyCost_dis3pct + S0_NPV_ProtectCost_V3_dis3pct + 
+  S0_NPV_ResRisk_high_dis3pct
+
+```
+
+#### Plot 
+```{r include = FALSE}
+
+# Create a sample data frame with 3 scenarios and 3 values for each
+S0 <- data.frame(
+  Assumption= rep(c("Low", "Mid", "High"), each = 3),
+  CostType = rep(c("Policy Cost", "Residual Risk", "Protection Cost"), times = 3),
+  Cost = c(S0_TotalPolicyCost_dis3pct, 
+           S0_NPV_ResRisk_low_dis3pct, 
+           S0_NPV_ProtectCost_V1_dis3pct, 
+           S0_TotalPolicyCost_dis3pct, 
+           S0_NPV_ResRisk_mid_dis3pct, 
+           S0_NPV_ProtectCost_V2_dis3pct,
+           S0_TotalPolicyCost_dis3pct, 
+           S0_NPV_ResRisk_high_dis3pct, 
+           S0_NPV_ProtectCost_V3_dis3pct)
+)
+
+# Convert 'CostType' to a factor and reorder the levels
+S0$Assumption <- factor(S0$Assumption, levels = c("Low", "Mid", "High"))
+S0$CostType <- factor(S0$CostType, levels = c("Protection Cost", "Residual Risk", "Policy Cost"))
+
+# Plot the stacked bar chart
+ggplot(S0, aes(x = Assumption, y = Cost, fill = CostType)) +
+  geom_bar(stat = "identity") +  # Create a stacked bar chart
+  labs(title = "S0: Cost Analysis by Assumptions \n(3% Discount Rate)", 
+       x = "Assumption", 
+       y = "Cost") +
+  scale_fill_manual(values = c("Policy Cost" = "blue", 
+                               "Residual Risk" = "red", 
+                               "Protection Cost" = "black")) +
+  theme_minimal() +
+  scale_y_continuous(labels = label_dollar(scale = 1e-6, suffix = "M"), limits = c(0, 4000000000)) +
+  labs(y = "Cost in Millions of dollars \n(2020USD)")
+
+
+```
+
+
+#S0: Analysis: 7% discount rate 
+###Total policy costs (Retrospective: 2012-2022)
+```{r inclue= FALSE}
+## Estimating Retrospective Policy Cost for S0 
+#Estimating total Response and recovery cost for households (NA)
+#Estimating total costs to repair roads (NA)
+
+#Estimating total costs for beach nourishment (2021 event only: Muni + Fed)
+S0_BeachRestore_dis7pct <-  S0_FedCostOB_NPV$dis7pct[S0_FedCostOB_NPV$variable=="OB_FedShare_BeachNourish_adj"] +
+  S0_MuniCostOB_NPV$dis7pct[S0_MuniCostOB_NPV$variable=="OB_LocalShare_BeachNourish_adj"]
+
+#Estimating NFIP policy costs
+S0_NFIP_PolicyCost_dis7pct <- S0_FedRevOB_NPV$dis7pct[S0_FedRevOB_NPV$variable=="OB_NFIP_PolicyCost_adj"]
+
+#Estimating NFIP claims (post-Sandy only)
+S0_NFIP_Claims_dis7pct <- S0_FedCostOB_NPV$dis7pct[S0_FedCostOB_NPV$variable=="OB_FedShare_NFIP"]
+
+
+# Create a vector of the object names
+object_names <- c("S0_BeachRestore_dis7pct",
+                  "S0_NFIP_PolicyCost_dis7pct",
+                  "S0_NFIP_Claims_dis7pct")
+
+
+# Use mget to get the values and names
+values <- mget(object_names)
+
+# Convert to a dataframe
+S0_PolicyCost_dis7pct <- data.frame(Label = names(values), Value = unlist(values))
+
+# Print the dataframe
+S0_PolicyCost_dis7pct
+
+# Total Policy cost
+S0_TotalPolicyCost_dis7pct <- sum(S0_PolicyCost_dis7pct$Value)
+```
+
+###Prospective costs (2022:2063)
+####Protection Costs Assumption
+```{r include=FALSE}
+S0_NPV_ProtectCost_V1_dis7pct <- S0_NPV_ProtectCost$dis7pct[S0_NPV_ProtectCost$Scenario=="V1"]
+S0_NPV_ProtectCost_V2_dis7pct <- S0_NPV_ProtectCost$dis7pct[S0_NPV_ProtectCost$Scenario=="V2"]
+S0_NPV_ProtectCost_V3_dis7pct <- S0_NPV_ProtectCost$dis7pct[S0_NPV_ProtectCost$Scenario=="V3"]
+
+```
+
+####Residual Risk Assumption 
+```{r include = FALSE}
+S0_NPV_ResRisk_low_dis7pct <- S0_NPV_ResRisk$dis7pct[S0_NPV_ResRisk$Scenario=="Low"]
+S0_NPV_ResRisk_mid_dis7pct <- S0_NPV_ResRisk$dis7pct[S0_NPV_ResRisk$Scenario=="Medium"]
+S0_NPV_ResRisk_high_dis7pct <- S0_NPV_ResRisk$dis7pct[S0_NPV_ResRisk$Scenario=="High"]
+
+```
+
+#### Plot 
+```{r include = FALSE}
+
+# Create a sample data frame with 3 scenarios and 3 values for each
+S0 <- data.frame(
+  Assumption= rep(c("Low", "Mid", "High"), each = 3),
+  CostType = rep(c("Policy Cost", "Residual Risk", "Protection Cost"), times = 3),
+  Cost = c(S0_TotalPolicyCost_dis7pct, 
+           S0_NPV_ResRisk_low_dis7pct, 
+           S0_NPV_ProtectCost_V1_dis7pct, 
+           S0_TotalPolicyCost_dis7pct, 
+           S0_NPV_ResRisk_mid_dis7pct, 
+           S0_NPV_ProtectCost_V2_dis7pct,
+           S0_TotalPolicyCost_dis7pct, 
+           S0_NPV_ResRisk_high_dis7pct, 
+           S0_NPV_ProtectCost_V3_dis7pct)
+)
+
+# Convert 'CostType' to a factor and reorder the levels
+S0$Assumption <- factor(S0$Assumption, levels = c("Low", "Mid", "High"))
+S0$CostType <- factor(S0$CostType, levels = c("Protection Cost", "Residual Risk", "Policy Cost"))
+
+# Plot the stacked bar chart
+ggplot(S0, aes(x = Assumption, y = Cost, fill = CostType)) +
+  geom_bar(stat = "identity") +  # Create a stacked bar chart
+  labs(title = "S0: Cost Analysis by Assumptions \n(7% Discount Rate)", 
+       x = "Assumption", 
+       y = "Cost") +
+  scale_fill_manual(values = c("Policy Cost" = "blue", 
+                               "Residual Risk" = "red", 
+                               "Protection Cost" = "black")) +
+  theme_minimal() +
+  scale_y_continuous(labels = label_dollar(scale = 1e-6, suffix = "M"), limits = c(0, 4000000000)) +
+  labs(y = "Cost in Millions of dollars \n(2020USD)")
+
+
+```
+
+
+#Generating comparison table
+```{r include=FALSE}
+# Define values for PolicyCost, ResidualRisk, and ProtectionCost for each assumption
+S0_PolicyCost <- list(
+  Low = c(S0_TotalPolicyCost_dis2pct, S0_TotalPolicyCost_dis3pct, S0_TotalPolicyCost_dis7pct),
+  Mid = c(S0_TotalPolicyCost_dis2pct, S0_TotalPolicyCost_dis3pct, S0_TotalPolicyCost_dis7pct),
+  High = c(S0_TotalPolicyCost_dis2pct, S0_TotalPolicyCost_dis3pct, S0_TotalPolicyCost_dis7pct)
+)
+
+S0_ResidualRisk <- list(
+  Low = c(S0_NPV_ResRisk_low_dis2pct, S0_NPV_ResRisk_low_dis3pct, S0_NPV_ResRisk_low_dis7pct),
+  Mid = c(S0_NPV_ResRisk_mid_dis2pct, S0_NPV_ResRisk_mid_dis3pct, S0_NPV_ResRisk_mid_dis7pct),
+  High = c(S0_NPV_ResRisk_high_dis2pct, S0_NPV_ResRisk_high_dis3pct, S0_NPV_ResRisk_high_dis7pct)
+)
+
+S0_ProtectCost <- list(
+  Low = c(S0_NPV_ProtectCost_V1_dis2pct, S0_NPV_ProtectCost_V1_dis3pct, S0_NPV_ProtectCost_V1_dis7pct),
+  Mid = c(S0_NPV_ProtectCost_V2_dis2pct, S0_NPV_ProtectCost_V2_dis3pct, S0_NPV_ProtectCost_V2_dis7pct),
+  High = c(S0_NPV_ProtectCost_V3_dis2pct, S0_NPV_ProtectCost_V3_dis3pct, S0_NPV_ProtectCost_V3_dis7pct)
+)
+
+# Combine into a single dataframe
+S0_SummaryTable <- data.frame(
+  Scenario = rep(c("S0"), times =9),
+  Assumption = rep(c("Low", "Mid", "High"), each = 3),
+  DiscountRate = rep(c("2%", "3%", "7%"), times = 3),
+  PolicyCost = unlist(S0_PolicyCost),
+  ResidualRisk = unlist(S0_ResidualRisk),
+  ProtectionCost = unlist(S0_ProtectCost)
+)
+
+# Calculate the total cost for each row
+S0_SummaryTable$TotalCost <- rowSums(S0_SummaryTable[, c("PolicyCost", "ResidualRisk", "ProtectionCost")])
+
+# Display the combined table
+rownames(S0_SummaryTable) <- NULL
+print(S0_SummaryTable)
+
+# Write out table
+path <- './data/SummaryAndAnalysis'
+write.csv(S0_SummaryTable, file.path(path, "S0_SummaryTable.csv"), row.names = FALSE)
+```
+

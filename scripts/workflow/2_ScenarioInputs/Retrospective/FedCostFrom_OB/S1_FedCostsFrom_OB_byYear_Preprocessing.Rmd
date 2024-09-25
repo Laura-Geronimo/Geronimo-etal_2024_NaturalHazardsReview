@@ -1,0 +1,348 @@
+---
+title: "Federal Costs from Ortley Beach - Preprocessing"
+author: "Laura Geronimo"
+date: "2024-08-23"
+output: html_document
+---
+The purpose of this worksheet is to estimate the costs to the Federal Government of maintaining properties on Ortley Beach for Scenario 1 (replicating the historical record). Costs are estimated for the 2012-2022 period. Specifically we estimate:
+
+1) Federal Costs direct to the municipal government for response and recovery (preprocessed)
+2) Federal Costs direct to individual households for response and recovery
+3) Federal cost share for repairs to roads and bridges (Route 35 & 37) (preprocessed)
+4) NFIP Claims from damages to homes in Ortley Beach
+5) Federal cost share for beach nourishment (preprocessed)
+
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+#Importing data
+```{r include=FALSE}
+
+getwd()
+setwd('C:/Users/lgero/Box/Research/NJSG/Tradeoff_Analysis/V4')
+
+#libraries ####
+library(tidyverse)
+library(networkD3)
+library(dplyr)
+library(data.table)
+library(stringr)
+library(readxl)
+library(purrr)
+
+options(scipen=999)
+
+##Importing Data ####
+Adjust <- read.csv('./data/BaselineData/InflationAdjusters.csv')
+
+
+#Data for downscaling
+OB_DemoData <- read_xlsx('./data/BaselineData/OrtleyBeach_DemographicData.xlsx', sheet=1)
+ZCTA_DemoData <- read_xlsx('./data/BaselineData/ZCTA_08751_DemographicData.xlsx', sheet=1)
+TR_DemoData <- read_xlsx('./data/BaselineData/TomsRiver_DemographicData.xlsx', sheet=1)
+
+TR_Sandy <- read_xlsx('./data/BaselineData/TomsRiver_SandyImpacts.xlsx', sheet=1)
+
+
+#Federal cost share for Municipal response and recovery to OB (already process as municipal revenues and downscaled to Ortley Beach (OB))
+FedCostOB <- read.csv('./data/BaselineData/S1_OB_Inputs/Revenues_ToTR_fromOB/MuniRevOB.csv')
+
+#Federal cost share for Individual response and recovery to OB (needs downscaling)
+TR_FedShare_DCA <- read.csv('./data/BaselineData/NJ_SandyTransparencey_produced/DCA_TR_FederalShare_ByYear.csv')
+TR_FedShare_IA <- read.csv('./data/BaselineData/NJ_SandyTransparencey_produced/IA_TR_FedShare_ByYear.csv')
+
+#Federal NFIP claims paid to OB ZCTA (must be downscaled by number of policies in force)
+ZOB_NFIP_Claims <- read.csv('C:/Users/lgero/Box/Research/NJSG/Tradeoff_Analysis/V4/data/DataDownloads/NFIP/Claims/produced/ZCTA_OB_NFIP_Claims.csv')
+
+ZOB_NFIP_PolicyData <- read.csv('C:/Users/lgero/Box/Research/NJSG/Tradeoff_Analysis/V4/data/DataDownloads/NFIP/Policies/produced/ZCTA_08571/NFIP_PolicyData_08571.csv')
+
+
+```
+
+#1) Federal Costs direct to the municipal government for response and recovery (preprocessed in MuniRevOB)
+#3) Federal cost share for repairs to roads and bridges (Route 35 & 37) (preprocessed in MuniRevOB)
+#5) Federal cost share for beach nourishment (preprocessed)
+
+```{r include= FALSE}
+#selecting relevant columns from pre-processed MuniRevOB file
+FedCostOB <- FedCostOB %>%
+  select(c(-X,
+           -OB_PropTaxRevTo_TR_Muni_adj,
+           -OB_PropTaxRevTo_TR_School_adj))
+```
+
+#2) Federal Costs direct to individual households for response and recovery
+
+##2a) Downscaling HUD / DCA data for individuals in Ortley Beach by project
+```{r include=FALSE}
+
+# List of project names to drop (already processed in MuniRevOB, or focused on rental properties which is less than 3% in OB)
+projects_to_drop <- c("DCA LGS Support for Governmental Entities LMI", 
+                      "DCA LGS Support for Governmental Entities UN", 
+                      "DCA Local Planning Services",
+                      "DCA LRRP",
+                      "DCA LRRP")
+
+# Drop rows where 'project' is in 'projects_to_drop'
+TR_FedShare_DCA <- TR_FedShare_DCA[!(TR_FedShare_DCA$Project %in% projects_to_drop), ]
+
+#Processing Projects ####
+
+##DCA Housing Landlord Incentive Program LMI####
+###Subset the DCA projects to DCA Housing Landlord Incentive Program LMI####
+TR_FedShare_DCA_Housing_LandLordIncentive_LMI <- subset(TR_FedShare_DCA, Project=="DCA Housing Landlord Incentive Program LMI")
+
+###Downscaling DCA DCA Housing Landlord Incentive Program LMI (downscaled by LMI pop) ####
+TR_lmi_pop_estimate <-  TR_Sandy$Estimate[TR_Sandy$Variable == "TR_LMI_Pop_SandyImpact"]
+OB_lmi_pop_estimate <-  TR_Sandy$Estimate[TR_Sandy$Variable == "OB_LMI_Pop_SandyImpact"]
+
+###Estimate DCA LMI funds disbursed per capita #### 
+TR_FedShare_DCA_Housing_LandLordIncentive_LMI$LMI_Disbursed_Per_Capita <- TR_FedShare_DCA_Housing_LandLordIncentive_LMI$Federal.Disbursed.Amount.Adj / TR_lmi_pop_estimate
+
+###Estimate DCA LMI funds disbursed to Ortley Beach #### 
+TR_FedShare_DCA_Housing_LandLordIncentive_LMI$Federal.Disbursed.Amount.Adj.OB <- TR_FedShare_DCA_Housing_LandLordIncentive_LMI$LMI_Disbursed_Per_Capita * OB_lmi_pop_estimate 
+
+###Separate downscaled OB estimates for LMI projects as standalone table####
+OB_FedShare_DCA_Housing_LandLordIncentive_LMI <- TR_FedShare_DCA_Housing_LandLordIncentive_LMI %>% select(
+  "Disbursed.Year",
+  "Federal.Disbursed.Amount.Adj.OB")
+
+###Renaming columns####
+colnames(OB_FedShare_DCA_Housing_LandLordIncentive_LMI ) <- c("Year", "OB_FedShare_DCA_Housing_LandLordIncentive_LMI")
+
+##DCA Housing NEP LMI####
+###Subset the DCA projects to DCA Housing NEP LMI ####
+TR_FedShare_DCA_Housing_NEP_LMI <- subset(TR_FedShare_DCA, Project=="DCA Housing NEP LMI")
+
+###Downscaling DCA Housing NEP LMI (downscaled by LMI pop) ####
+TR_lmi_pop_estimate <-  TR_Sandy$Estimate[TR_Sandy$Variable == "TR_LMI_Pop_SandyImpact"]
+OB_lmi_pop_estimate <-  TR_Sandy$Estimate[TR_Sandy$Variable == "OB_LMI_Pop_SandyImpact"]
+
+###Estimate DCA LMI funds disbursed per capita #### 
+TR_FedShare_DCA_Housing_NEP_LMI$DCA_Disbursed_Per_Capita <- TR_FedShare_DCA_Housing_NEP_LMI$Federal.Disbursed.Amount.Adj / 
+TR_lmi_pop_estimate 
+
+###Estimate DCA LMI funds disbursed to Ortley Beach #### 
+TR_FedShare_DCA_Housing_NEP_LMI$Federal.Disbursed.Amount.Adj.OB <- TR_FedShare_DCA_Housing_NEP_LMI$DCA_Disbursed_Per_Capita * OB_lmi_pop_estimate   
+
+###Separate downscaled OB estimates for projects as standalone table####
+OB_FedShare_DCA_Housing_NEP_LMI <- TR_FedShare_DCA_Housing_NEP_LMI %>% select(
+  "Disbursed.Year",
+  "Federal.Disbursed.Amount.Adj.OB")
+
+###Renaming columns####
+colnames(OB_FedShare_DCA_Housing_NEP_LMI) <- c("Year", "OB_FedShare_DCA_Housing_NEP_LMI")
+
+
+##DCA LMI Homeowner Rebuilding Program ####
+###Subset the DCA LMI Homeowner Rebuilding Program ####
+TR_DCA_LMI_HomeownerRebuilding <- subset(TR_FedShare_DCA, Project=="DCA LMI Homeowner Rebuilding Program")
+
+###Downscaling DCA LMI Homeowner Rebuilding Program  (downscaled by LMI pop) ####
+TR_lmi_pop_estimate <-  TR_Sandy$Estimate[TR_Sandy$Variable == "TR_LMI_Pop_SandyImpact"]
+OB_lmi_pop_estimate <-  TR_Sandy$Estimate[TR_Sandy$Variable == "OB_LMI_Pop_SandyImpact"]
+
+###Estimate DCA LMI Homeowner Rebuilding Program  disbursed per LMI Pop #### 
+TR_DCA_LMI_HomeownerRebuilding$DCA_LMI_Disbursed_Per_LMI_pop <- TR_DCA_LMI_HomeownerRebuilding $Federal.Disbursed.Amount.Adj / 
+TR_lmi_pop_estimate 
+
+###Estimate DCA LMI Homeowner Rebuilding Program  funds disbursed to Ortley Beach #### 
+TR_DCA_LMI_HomeownerRebuilding$Federal.Disbursed.Amount.Adj.OB <- TR_DCA_LMI_HomeownerRebuilding$DCA_LMI_Disbursed_Per_LMI_pop * OB_lmi_pop_estimate  
+
+###Separate downscaled OB estimates for Local Planning Service projects as standalone table####
+OB_FedShare_DCA_LMI_HomeownerRebuilding <- TR_DCA_LMI_HomeownerRebuilding  %>% select(
+  "Disbursed.Year",
+  "Federal.Disbursed.Amount.Adj.OB")
+
+###Renaming columns####
+colnames(OB_FedShare_DCA_LMI_HomeownerRebuilding) <- c("Year", "OB_FedShare_DCA_LMI_HomeownerRebuilding")
+
+
+##DCA Resettlement LMI####
+###Subset the DCA Resettlement LMI####
+TR_FedShare_DCA_Resettlement_LMI <- subset(TR_FedShare_DCA, Project=="DCA Resettlement LMI")
+
+###Downscaling DCA Resettlement LMI  (downscaled by LMI pop) ####
+TR_lmi_pop_estimate <-  TR_Sandy$Estimate[TR_Sandy$Variable == "TR_LMI_Pop_SandyImpact"]
+OB_lmi_pop_estimate <-  TR_Sandy$Estimate[TR_Sandy$Variable == "OB_LMI_Pop_SandyImpact"]
+
+###Estimate DCA  DCA Resettlement LMI disbursed per LMI #### 
+TR_FedShare_DCA_Resettlement_LMI$DCA_LMI_Disbursed_Per_LMI_pop <- TR_FedShare_DCA_Resettlement_LMI$Federal.Disbursed.Amount.Adj / TR_lmi_pop_estimate 
+
+###Estimate  DCA Resettlement LMI funds disbursed to Ortley Beach #### 
+TR_FedShare_DCA_Resettlement_LMI$Federal.Disbursed.Amount.Adj.OB <- TR_FedShare_DCA_Resettlement_LMI$DCA_LMI_Disbursed_Per_LMI_pop * OB_lmi_pop_estimate
+
+###Separate downscaled OB estimates for Local Planning Service projects as standalone table####
+OB_FedShare_DCA_Resettlement_LMI <- TR_FedShare_DCA_Resettlement_LMI %>% select(
+  "Disbursed.Year",
+  "Federal.Disbursed.Amount.Adj.OB")
+
+###Renaming columns####
+colnames(OB_FedShare_DCA_Resettlement_LMI) <- c("Year", "OB_FedShare_DCA_Resettlement_LMI")
+
+
+##DCA Resettlement UN####
+###Subset the DCA Resettlement UN####
+TR_FedShare_DCA_Resettlement_UN <- subset(TR_FedShare_DCA, Project=="DCA Resettlement UN")
+
+###Downscaling DCA Resettlement UN  (downscaled by estimates of OwnerOccupied Housing Units impacted by Sandy) ####
+TR_OwnOccSandy_estimate <-  TR_Sandy$Estimate[TR_Sandy$Variable == "TR_HU_OwnOcc_SandyImpact"]
+OB_OwnOccSandy_estimate <-  TR_Sandy$Estimate[TR_Sandy$Variable == "OB_HU_OwnOcc_SandyImpact"]
+
+###Estimate DCA Local Planning Services disbursed per OwnOccHU #### 
+TR_FedShare_DCA_Resettlement_UN$DCA_UN_Disbursed_Per_OwnOccHU <- TR_FedShare_DCA_Resettlement_UN$Federal.Disbursed.Amount.Adj / TR_OwnOccSandy_estimate 
+
+###Estimate DCA Local Planning Services funds disbursed to Ortley Beach #### 
+TR_FedShare_DCA_Resettlement_UN$Federal.Disbursed.Amount.Adj.OB <- TR_FedShare_DCA_Resettlement_UN$DCA_UN_Disbursed_Per_OwnOccHU * OB_OwnOccSandy_estimate
+
+###Separate downscaled OB estimates for Local Planning Service projects as standalone table####
+OB_FedShare_DCA_Resettlement_UN <- TR_FedShare_DCA_Resettlement_UN %>% select(
+  "Disbursed.Year",
+  "Federal.Disbursed.Amount.Adj.OB")
+
+###Renaming columns####
+colnames(OB_FedShare_DCA_Resettlement_UN) <- c("Year", "OB_FedShare_DCA_Resettlement_UN")
+
+
+##DCA RREM LMI####
+###Subset the RREM LMI####
+TR_FedShare_DCA_RREM_LMI <- subset(TR_FedShare_DCA, Project=="DCA RREM LMI")
+
+###Downscaling RREM LMI  (downscaled by LMI pop) ####
+TR_lmi_pop_estimate <-  TR_Sandy$Estimate[TR_Sandy$Variable == "TR_LMI_Pop_SandyImpact"]
+OB_lmi_pop_estimate <-  TR_Sandy$Estimate[TR_Sandy$Variable == "OB_LMI_Pop_SandyImpact"]
+
+###Estimate DCA Local Planning Services disbursed per capita #### 
+TR_FedShare_DCA_RREM_LMI$DCA_UN_Disbursed_Per_Capita <- TR_FedShare_DCA_RREM_LMI$Federal.Disbursed.Amount.Adj / TR_lmi_pop_estimate 
+
+###Estimate DCA Local Planning Services funds disbursed to Ortley Beach #### 
+TR_FedShare_DCA_RREM_LMI$Federal.Disbursed.Amount.Adj.OB <- TR_FedShare_DCA_RREM_LMI$DCA_UN_Disbursed_Per_Capita * OB_lmi_pop_estimate 
+
+###Separate downscaled OB estimates for Local Planning Service projects as standalone table####
+OB_FedShare_DCA_RREM_LMI <- TR_FedShare_DCA_RREM_LMI %>% select(
+  "Disbursed.Year",
+  "Federal.Disbursed.Amount.Adj.OB")
+
+###Renaming columns####
+colnames(OB_FedShare_DCA_RREM_LMI) <- c("Year", "OB_FedShare_DCA_RREM_LMI")
+
+
+##DCA RREM UN####
+###Subset the RREM UN####
+TR_FedShare_DCA_RREM_UN <- subset(TR_FedShare_DCA, Project=="DCA RREM UN")
+
+###Downscaling RREM UN  (downscaled by estimates of OwnerOccupied Housing Units impacted by Sandy) ####
+TR_OwnOccSandy_estimate <-  TR_Sandy$Estimate[TR_Sandy$Variable == "TR_HU_OwnOcc_SandyImpact"]
+OB_HU_OwnOccSandy_estimate <-  TR_Sandy$Estimate[TR_Sandy$Variable == "OB_HU_OwnOcc_SandyImpact"]
+
+###Estimate DCA Local Planning Services disbursed per capita #### 
+TR_FedShare_DCA_RREM_UN$DCA_UN_Disbursed_Per_Capita <- TR_FedShare_DCA_RREM_UN$Federal.Disbursed.Amount.Adj / TR_OwnOccSandy_estimate 
+
+###Estimate DCA Local Planning Services funds disbursed to Ortley Beach #### 
+TR_FedShare_DCA_RREM_UN$Federal.Disbursed.Amount.Adj.OB <- TR_FedShare_DCA_RREM_UN$DCA_UN_Disbursed_Per_Capita * OB_HU_OwnOccSandy_estimate
+
+###Separate downscaled OB estimates for Local Planning Service projects as standalone table####
+OB_FedShare_DCA_RREM_UN <- TR_FedShare_DCA_RREM_UN %>% select(
+  "Disbursed.Year",
+  "Federal.Disbursed.Amount.Adj.OB")
+
+###Renaming columns####
+colnames(OB_FedShare_DCA_RREM_UN) <- c("Year", "OB_FedShare_DCA_RREM_UN")
+
+```
+
+##2a) Downscaling IA data for individuals in Ortley Beach 
+```{R include=FALSE}
+#Processing IA####
+head(TR_FedShare_IA)
+
+###Downscaling IA (downscaled by estimates of owner occupied HUs impacted by Sandy) ####
+TR_HU_OwnOcc_SandyImpact_estimate <-  TR_Sandy$Estimate[TR_Sandy$Variable == "TR_HU_OwnOcc_SandyImpact"]
+OB_HU_OwnOcc_SandyImpact_estimate <-  TR_Sandy$Estimate[TR_Sandy$Variable == "OB_HU_OwnOcc_SandyImpact"]
+
+###Estimate IA funds disbursed per HU #### 
+TR_FedShare_IA$IA_Disbursed_Per_HU <- TR_FedShare_IA$Disbursed.Amount_adj / TR_HU_OwnOcc_SandyImpact_estimate
+
+###Estimate DCA LMI funds disbursed to Ortley Beach #### 
+TR_FedShare_IA$Federal.Disbursed.Amount.Adj.OB <- TR_FedShare_IA$IA_Disbursed_Per_HU * OB_HU_OwnOcc_SandyImpact_estimate
+
+###Separate downscaled OB estimates for LMI projects as standalone table####
+OB_FedShare_IA <- TR_FedShare_IA %>% select(
+  "Year",
+  "Federal.Disbursed.Amount.Adj.OB")
+
+###Renaming columns####
+colnames(OB_FedShare_IA ) <- c("Year", "OB_FedShare_IA")
+
+```
+
+
+# 4) NFIP Claims from damages to homes in Ortley Beach 
+### Downscaling Claims from ZCTA to OB by estimated number of homes with policies in force at the time of storm ####
+
+```{r include=False}
+#number of housing units in 2012 in ZCTA
+ZCTA_NumberHU2012 <- as.numeric(ZCTA_DemoData$Z_HU[ZCTA_DemoData$Year==2012])
+
+#number of housing units impacted by Sandy in 2012 in Ortley Beach
+OB_NumberHU2012 <- as.numeric(TR_Sandy$Estimate[TR_Sandy$Variable=="OB_HU_SandyImpact"])
+
+#number of policies in force in 2012 in ZCTA
+ZCTA_NumberPoliciesInForce2012 <-  as.numeric(ZOB_NFIP_PolicyData$numberOfPolicies[ZOB_NFIP_PolicyData$policyEffectiveYear == 2012])
+
+
+#proportion of Housing Units with policies in force in 2012 in ZCTA
+ZCTA_PctPoliciesInForce2012 <- ZCTA_NumberPoliciesInForce2012/ ZCTA_NumberHU2012 
+
+#estimate of number of housing units with policies in force in Ortley Beach in 2012
+OB_NumberPoliciesInForce2012_E <- OB_NumberHU2012 * ZCTA_PctPoliciesInForce2012 
+
+
+#downscaling Claims payouts by estimate of housing units with policies in force
+ZOB_NFIP_Claims$OB_NFIP_BuildingsClaims_adj <- ZOB_NFIP_Claims$NFIP_BuildingsClaims_adj / ZCTA_NumberPoliciesInForce2012 * OB_NumberPoliciesInForce2012_E
+
+ZOB_NFIP_Claims$OB_NFIP_ContentsClaims_adj <- ZOB_NFIP_Claims$NFIP_ContentsClaims_adj / ZCTA_NumberPoliciesInForce2012 * OB_NumberPoliciesInForce2012_E
+
+ZOB_NFIP_Claims$OB_NFIP_ICCClaims_adj <- ZOB_NFIP_Claims$NFIP_ICCClaims_adj / ZCTA_NumberPoliciesInForce2012 * OB_NumberPoliciesInForce2012_E
+
+#retaining OB variables
+OB_NFIP_Claims <- ZOB_NFIP_Claims %>%
+  select(Year,
+         OB_NFIP_BuildingsClaims_adj,
+         OB_NFIP_ContentsClaims_adj,
+         OB_NFIP_ICCClaims_adj)
+
+
+```
+
+
+#Knitting tables together to obtain Federal costs from Ortley Beach by Year
+```{r include=FALSE}
+library(purrr)
+list_of_dfs <- list(FedCostOB,
+                    OB_FedShare_DCA_Housing_LandLordIncentive_LMI,
+                    OB_FedShare_DCA_Housing_NEP_LMI,
+                    OB_FedShare_DCA_LMI_HomeownerRebuilding,
+                    OB_FedShare_DCA_Resettlement_LMI,
+                    OB_FedShare_DCA_Resettlement_UN,
+                    OB_FedShare_DCA_RREM_LMI,
+                    OB_FedShare_DCA_RREM_UN,
+                    OB_FedShare_IA,
+                    OB_NFIP_Claims)
+
+FedCostOB <- reduce(list_of_dfs, function(x, y) left_join(x, y, by = "Year"))
+
+
+```
+
+#Exporting S1 OB input tables created so far:
+```{r include=FALSE}
+path <- './data/BaselineData/S1_OB_Inputs/Costs_ToFed_fromOB'
+
+write.csv(FedCostOB, file.path(path, "FedCostOB.csv"), row.names = TRUE)
+
+
+```

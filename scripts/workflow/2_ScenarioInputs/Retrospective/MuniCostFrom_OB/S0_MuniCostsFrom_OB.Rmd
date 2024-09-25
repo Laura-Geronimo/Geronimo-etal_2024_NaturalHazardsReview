@@ -1,0 +1,288 @@
+---
+title: "S0_MuniCostFomOB_Table"
+author: "Laura Geronimo"
+date: "2024-08-29"
+output: html_document
+---
+The purpose of this worksheet is to estimate the NPV for costs to Toms River for Scenario 0. We discount the costs and group them into buckets for analysis.
+
+We discount at 2%, 3%, 6%, and 7% based on justifications provided in the SI.
+
+Simplifying Assumptions:
+-Public works remains constant at pre-storm rate
+-Public safety remains constant at pre-storm rate
+-School district costs remain constant at pre-storm rate
+-Municipal cost share for beach nourishment: retain cost for 2022 event only
+-Drop all response and recovery costs
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+#Importing data
+```{r include=FALSE}
+
+getwd()
+setwd('C:/Users/lgero/Box/Research/NJSG/Tradeoff_Analysis/V4')
+
+#libraries ####
+library(tidyverse)
+library(networkD3)
+library(dplyr)
+library(data.table)
+library(stringr)
+library(readxl)
+library(purrr)
+
+options(scipen=999)
+
+
+##Importing Data ####
+MuniCostOB <- read.csv('./data/BaselineData/S1_OB_Inputs/Costs_ToTR_fromOB/MuniCostOB.csv')
+MuniCostOB <- MuniCostOB[,c(-1)]
+
+```
+
+# Keeping public works, public safety, and school district costs constant at pre-storm rates
+```{r include = FALSE}
+
+S0_MuniCostOB <- MuniCostOB
+
+S0_MuniCostOB$OB_Public_Works_adj[S0_MuniCostOB$Year > 2012] <- 
+  S0_MuniCostOB$OB_Public_Works_adj[S0_MuniCostOB$Year == 2012]
+
+S0_MuniCostOB$OB_Public_Safety_adj[S0_MuniCostOB$Year > 2012] <- 
+  S0_MuniCostOB$OB_Public_Safety_adj[S0_MuniCostOB$Year == 2012]
+
+S0_MuniCostOB$OB_SchoolExpend_adj[S0_MuniCostOB$Year > 2012] <- 
+  S0_MuniCostOB$OB_SchoolExpend_adj[S0_MuniCostOB$Year == 2012]
+
+```
+
+#Reducing Municipal cost share for beach nourishment to 2022 event only
+```{r include = FALSE}
+
+S0_MuniCostOB$OB_LocalShare_BeachNourish_adj[S0_MuniCostOB$Year < 2022] <- NA
+
+```
+
+#dropping all response and recovery costs
+```{r include = FALSE}
+
+S0_MuniCostOB <- S0_MuniCostOB %>% 
+  select(Year,
+         OB_Public_Works_adj,
+         OB_Public_Safety_adj,
+         OB_SchoolExpend_adj,
+         OB_LocalShare_BeachNourish_adj)
+
+```
+
+
+
+#Discounting values to 2%, summing to NPV, and grouping in buckets
+```{r include=FALSE}
+
+###discounting flows at 2% ####
+#Creating a year index 
+S0_MuniCostOB$YearIndex <- 0:10
+
+#Define the function for discounting flows by 2% 
+dis2pct <- function(df, amount_cols, year_index_col, discount_rate = 0.02, base_year = 0) {
+  for (col in amount_cols) {
+    discounted_col_name <- paste0(col, "_dis2pct")
+    df[[discounted_col_name]] <- df[[col]] / ((1 + discount_rate) ^ (df[[year_index_col]] - base_year))
+  }
+  return(df)
+}
+
+# List of columns to discount - select colums starting with OB 
+amount_cols <-  grep("^OB_", colnames(S0_MuniCostOB), value = TRUE)
+
+# Apply the discount function
+S0_MuniCostOB_dis2pct <- dis2pct(S0_MuniCostOB, amount_cols, year_index_col = "YearIndex")
+
+# Remove undiscounted columns
+S0_MuniCostOB_dis2pct <- S0_MuniCostOB_dis2pct %>%
+  select(Year, YearIndex, ends_with("_dis2pct"))
+
+###Summing to NPV ####
+#Create a new data frame that sums the discounted columns for NPV (2020USD)
+S0_MuniCostOB_dis2pct_NPV <- S0_MuniCostOB_dis2pct %>%
+  summarise(across(ends_with("_dis2pct"), sum, na.rm = TRUE))
+
+#pivoting tables longer
+S0_MuniCostOB_dis2pct_NPV <- S0_MuniCostOB_dis2pct_NPV %>%
+  pivot_longer(
+    cols = everything(),      # Pivot all columns
+    names_to = "variable",     # New column with variable names
+    values_to = "dis2pct"      # New column with the values
+  ) %>%
+  mutate(variable = sub("_dis2pct", "", variable)) 
+```
+
+
+
+#Discounting values to 3%, summing to NPV, and grouping in buckets
+```{r include=FALSE}
+
+###discounting flows at 3% ####
+#Creating a year index 
+S0_MuniCostOB$YearIndex <- 0:10
+
+#Define the function for discounting flows by 3% 
+dis3pct <- function(df, amount_cols, year_index_col, discount_rate = 0.03, base_year = 0) {
+  for (col in amount_cols) {
+    discounted_col_name <- paste0(col, "_dis3pct")
+    df[[discounted_col_name]] <- df[[col]] / ((1 + discount_rate) ^ (df[[year_index_col]] - base_year))
+  }
+  return(df)
+}
+
+# List of columns to discount - select colums starting with OB 
+amount_cols <-  grep("^OB_", colnames(S0_MuniCostOB), value = TRUE)
+
+# Apply the discount function
+S0_MuniCostOB_dis3pct <- dis3pct(S0_MuniCostOB, amount_cols, year_index_col = "YearIndex")
+
+# Remove undiscounted columns
+S0_MuniCostOB_dis3pct <- S0_MuniCostOB_dis3pct %>%
+  select(Year, YearIndex, ends_with("_dis3pct"))
+
+###Summing to NPV ####
+#Create a new data frame that sums the discounted columns for NPV (3030USD)
+S0_MuniCostOB_dis3pct_NPV <- S0_MuniCostOB_dis3pct %>%
+  summarise(across(ends_with("_dis3pct"), sum, na.rm = TRUE))
+
+#pivoting tables longer
+S0_MuniCostOB_dis3pct_NPV <- S0_MuniCostOB_dis3pct_NPV %>%
+  pivot_longer(
+    cols = everything(),      # Pivot all columns
+    names_to = "variable",     # New column with variable names
+    values_to = "dis3pct"      # New column with the values
+  ) %>%
+  mutate(variable = sub("_dis3pct", "", variable)) 
+```
+
+
+#Discounting values to 6%, summing to NPV, and grouping in buckets
+```{r include=FALSE}
+
+###discounting flows at 6% ####
+#Creating a year index 
+S0_MuniCostOB$YearIndex <- 0:10
+
+#Define the function for discounting flows by 6% 
+dis6pct <- function(df, amount_cols, year_index_col, discount_rate = 0.06, base_year = 0) {
+  for (col in amount_cols) {
+    discounted_col_name <- paste0(col, "_dis6pct")
+    df[[discounted_col_name]] <- df[[col]] / ((1 + discount_rate) ^ (df[[year_index_col]] - base_year))
+  }
+  return(df)
+}
+
+# List of columns to discount - select colums starting with OB 
+amount_cols <-  grep("^OB_", colnames(S0_MuniCostOB), value = TRUE)
+
+# Apply the discount function
+S0_MuniCostOB_dis6pct <- dis6pct(S0_MuniCostOB, amount_cols, year_index_col = "YearIndex")
+
+# Remove undiscounted columns
+S0_MuniCostOB_dis6pct <- S0_MuniCostOB_dis6pct %>%
+  select(Year, YearIndex, ends_with("_dis6pct"))
+
+###Summing to NPV ####
+#Create a new data frame that sums the discounted columns for NPV (6060USD)
+S0_MuniCostOB_dis6pct_NPV <- S0_MuniCostOB_dis6pct %>%
+  summarise(across(ends_with("_dis6pct"), sum, na.rm = TRUE))
+
+#pivoting tables longer
+S0_MuniCostOB_dis6pct_NPV <- S0_MuniCostOB_dis6pct_NPV %>%
+  pivot_longer(
+    cols = everything(),      # Pivot all columns
+    names_to = "variable",     # New column with variable names
+    values_to = "dis6pct"      # New column with the values
+  ) %>%
+  mutate(variable = sub("_dis6pct", "", variable)) 
+
+```
+
+
+#Discounting values to 7%, summing to NPV, and grouping in buckets
+```{r include=FALSE}
+
+###discounting flows at 7% ####
+#Creating a year index 
+S0_MuniCostOB$YearIndex <- 0:10
+
+#Define the function for discounting flows by 7% 
+dis7pct <- function(df, amount_cols, year_index_col, discount_rate = 0.07, base_year = 0) {
+  for (col in amount_cols) {
+    discounted_col_name <- paste0(col, "_dis7pct")
+    df[[discounted_col_name]] <- df[[col]] / ((1 + discount_rate) ^ (df[[year_index_col]] - base_year))
+  }
+  return(df)
+}
+
+# List of columns to discount - select colums starting with OB 
+amount_cols <-  grep("^OB_", colnames(S0_MuniCostOB), value = TRUE)
+
+# Apply the discount function
+S0_MuniCostOB_dis7pct <- dis7pct(S0_MuniCostOB, amount_cols, year_index_col = "YearIndex")
+
+# Remove undiscounted columns
+S0_MuniCostOB_dis7pct <- S0_MuniCostOB_dis7pct %>%
+  select(Year, YearIndex, ends_with("_dis7pct"))
+
+###Summing to NPV ####
+#Create a new data frame that sums the discounted columns for NPV (7070USD)
+S0_MuniCostOB_dis7pct_NPV <- S0_MuniCostOB_dis7pct %>%
+  summarise(across(ends_with("_dis7pct"), sum, na.rm = TRUE))
+
+#pivoting tables longer
+S0_MuniCostOB_dis7pct_NPV <- S0_MuniCostOB_dis7pct_NPV %>%
+  pivot_longer(
+    cols = everything(),      # Pivot all columns
+    names_to = "variable",     # New column with variable names
+    values_to = "dis7pct"      # New column with the values
+  ) %>%
+  mutate(variable = sub("_dis7pct", "", variable)) 
+
+
+```
+
+
+
+
+#Joining data for export
+```{r include = FALSE}
+#pivoting tables longer
+S0_MuniCostOB_NPV <- S0_MuniCostOB_dis2pct_NPV %>%
+  left_join(S0_MuniCostOB_dis3pct_NPV, by = "variable") %>%
+  left_join(S0_MuniCostOB_dis6pct_NPV, by = "variable") %>%
+  left_join(S0_MuniCostOB_dis7pct_NPV, by = "variable")
+
+```
+
+#Writing out discounted NPV files
+```{r include= FALSE}
+path <- './data/BaselineData/S0_OB_Inputs'
+
+write.csv(S0_MuniCostOB_NPV, file.path(path, "S0_MuniCostOB_NPV.csv"), row.names = TRUE)
+
+```
+
+#QC
+```{r include= FALSE}
+S0_MuniCostOB_dis2pct_NPV <- sum(S0_MuniCostOB_NPV$dis2pct)
+S0_MuniCostOB_dis3pct_NPV <- sum(S0_MuniCostOB_NPV$dis3pct)
+S0_MuniCostOB_dis6pct_NPV <- sum(S0_MuniCostOB_NPV$dis6pct)
+S0_MuniCostOB_dis7pct_NPV <- sum(S0_MuniCostOB_NPV$dis7pct)
+
+S0_MuniCostOB_dis2pct_NPV
+S0_MuniCostOB_dis3pct_NPV
+S0_MuniCostOB_dis6pct_NPV
+S0_MuniCostOB_dis7pct_NPV
+```

@@ -1,0 +1,237 @@
+---
+title: "S0_FedRevFrom_OB"
+author: "Laura Geronimo"
+date: "2024-09-13"
+output: html_document
+---
+
+The purpose of this worksheet is to estimate the NPV for benefits to the Federal Government for Scenario 0. 
+
+Simplifying Assumptions
+
+Assume NFIP policies same as 2012, with 3%  growth rate on par with change in assessed value
+
+We discount at 2%, 3%, and 7% based on justifications provided in the SI.
+
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+#Importing data
+```{r include=FALSE}
+
+getwd()
+setwd('C:/Users/lgero/Box/Research/NJSG/Tradeoff_Analysis/V4')
+
+#libraries ####
+library(tidyverse)
+library(networkD3)
+library(dplyr)
+library(data.table)
+library(stringr)
+library(readxl)
+library(purrr)
+
+options(scipen=999)
+
+
+##Importing Data ####
+FedRevOB <- read.csv('./data/BaselineData/S1_OB_Inputs/Revenues_ToFed_fromOB/S1_OB_FedRev_NFIP_PolicyCost_adj.csv')
+FedRevOB <- FedRevOB[,c(-1)]
+
+```
+
+#Adjusting by S0 Simplifying Assumptions
+```{r include = FALSE}
+Baseline_2012data <- subset(FedRevOB, Year==2012)
+
+### Function to project property tax revenue ####
+project_revenue <- function(initial_revenue, start_year = 2012, end_year = 2022, growth_rate = 0.03) {
+  years <- seq(start_year, end_year) # Create a sequence of years
+  revenues <- numeric(length(years)) # Initialize a vector to store projected revenues
+  
+  # Set the revenue for the first year (2012)
+  revenues[1] <- initial_revenue
+  
+  # Loop over the remaining years and calculate the projected revenue
+  for (i in 2:length(years)) {
+    revenues[i] <- revenues[i - 1] * (1 + growth_rate)
+  }
+  
+  # Create a data frame with the results
+  result <- data.frame(Year = years, Projected_Revenue = revenues)
+  return(result)
+}
+
+### Applying to Municipal Revenues ####
+initial_revenue_2012 <- Baseline_2012data$OB_NFIP_PolicyCost_adj  
+projected_Fed_revenues <- project_revenue(initial_revenue_2012)
+print(projected_Fed_revenues)
+
+colnames(projected_Fed_revenues) <- c("Year", "OB_NFIP_PolicyCost_adj")
+
+
+S0_FedRevOB <- projected_Fed_revenues
+
+```
+
+
+#Discounting values to 2%, summing to NPV
+```{r include=FALSE}
+
+###discounting flows at 2% ####
+#Creating a year index 
+S0_FedRevOB$YearIndex <- 0:10
+
+#Define the function for discounting flows by 2% 
+dis2pct <- function(df, amount_cols, year_index_col, discount_rate = 0.02, base_year = 0) {
+  for (col in amount_cols) {
+    discounted_col_name <- paste0(col, "_dis2pct")
+    df[[discounted_col_name]] <- df[[col]] / ((1 + discount_rate) ^ (df[[year_index_col]] - base_year))
+  }
+  return(df)
+}
+
+# List of columns to discount - select colums starting with OB 
+amount_cols <-  grep("^OB_", colnames(S0_FedRevOB), value = TRUE)
+
+# Apply the discount function
+S0_FedRevOB_dis2pct <- dis2pct(S0_FedRevOB, amount_cols, year_index_col = "YearIndex")
+
+# Remove undiscounted columns
+S0_FedRevOB_dis2pct <- S0_FedRevOB_dis2pct %>%
+  select(Year, YearIndex, ends_with("_dis2pct"))
+
+###Summing to NPV ####
+#Create a new data frame that sums the discounted columns for NPV (2020USD)
+S0_FedRevOB_dis2pct_NPV <- S0_FedRevOB_dis2pct %>%
+  summarise(across(ends_with("_dis2pct"), sum, na.rm = TRUE))
+
+#pivoting tables longer
+S0_FedRevOB_dis2pct_NPV <- S0_FedRevOB_dis2pct_NPV %>%
+  pivot_longer(
+    cols = everything(),      # Pivot all columns
+    names_to = "variable",     # New column with variable names
+    values_to = "dis2pct"      # New column with the values
+  ) %>%
+  mutate(variable = sub("_dis2pct", "", variable)) 
+```
+
+
+
+#Discounting values to 3%, summing to NPV
+```{r include=FALSE}
+
+###discounting flows at 3% ####
+#Creating a year index 
+S0_FedRevOB$YearIndex <- 0:10
+
+#Define the function for discounting flows by 3% 
+dis3pct <- function(df, amount_cols, year_index_col, discount_rate = 0.03, base_year = 0) {
+  for (col in amount_cols) {
+    discounted_col_name <- paste0(col, "_dis3pct")
+    df[[discounted_col_name]] <- df[[col]] / ((1 + discount_rate) ^ (df[[year_index_col]] - base_year))
+  }
+  return(df)
+}
+
+# List of columns to discount - select colums starting with OB 
+amount_cols <-  grep("^OB_", colnames(S0_FedRevOB), value = TRUE)
+
+# Apply the discount function
+S0_FedRevOB_dis3pct <- dis3pct(S0_FedRevOB, amount_cols, year_index_col = "YearIndex")
+
+# Remove undiscounted columns
+S0_FedRevOB_dis3pct <- S0_FedRevOB_dis3pct %>%
+  select(Year, YearIndex, ends_with("_dis3pct"))
+
+###Summing to NPV ####
+#Create a new data frame that sums the discounted columns for NPV (2020USD)
+S0_FedRevOB_dis3pct_NPV <- S0_FedRevOB_dis3pct %>%
+  summarise(across(ends_with("_dis3pct"), sum, na.rm = TRUE))
+
+#pivoting tables longer
+S0_FedRevOB_dis3pct_NPV <- S0_FedRevOB_dis3pct_NPV %>%
+  pivot_longer(
+    cols = everything(),      # Pivot all columns
+    names_to = "variable",     # New column with variable names
+    values_to = "dis3pct"      # New column with the values
+  ) %>%
+  mutate(variable = sub("_dis3pct", "", variable)) 
+```
+
+
+
+#Discounting values to 7%, summing to NPV
+```{r include=FALSE}
+
+###discounting flows at 7% ####
+#Creating a year index 
+S0_FedRevOB$YearIndex <- 0:10
+
+#Define the function for discounting flows by 7% 
+dis7pct <- function(df, amount_cols, year_index_col, discount_rate = 0.07, base_year = 0) {
+  for (col in amount_cols) {
+    discounted_col_name <- paste0(col, "_dis7pct")
+    df[[discounted_col_name]] <- df[[col]] / ((1 + discount_rate) ^ (df[[year_index_col]] - base_year))
+  }
+  return(df)
+}
+
+# List of columns to discount - select colums starting with OB 
+amount_cols <-  grep("^OB_", colnames(S0_FedRevOB), value = TRUE)
+
+# Apply the discount function
+S0_FedRevOB_dis7pct <- dis7pct(S0_FedRevOB, amount_cols, year_index_col = "YearIndex")
+
+# Remove undiscounted columns
+S0_FedRevOB_dis7pct <- S0_FedRevOB_dis7pct %>%
+  select(Year, YearIndex, ends_with("_dis7pct"))
+
+###Summing to NPV ####
+#Create a new data frame that sums the discounted columns for NPV (7070USD)
+S0_FedRevOB_dis7pct_NPV <- S0_FedRevOB_dis7pct %>%
+  summarise(across(ends_with("_dis7pct"), sum, na.rm = TRUE))
+
+#pivoting tables longer
+S0_FedRevOB_dis7pct_NPV <- S0_FedRevOB_dis7pct_NPV %>%
+  pivot_longer(
+    cols = everything(),      # Pivot all columns
+    names_to = "variable",     # New column with variable names
+    values_to = "dis7pct"      # New column with the values
+  ) %>%
+  mutate(variable = sub("_dis7pct", "", variable)) 
+```
+
+
+
+#Joining data for export
+```{r include = FALSE}
+#pivoting tables longer
+S0_FedRevOB_NPV <- S0_FedRevOB_dis2pct_NPV %>%
+  left_join(S0_FedRevOB_dis3pct_NPV, by = "variable") %>%
+  left_join(S0_FedRevOB_dis7pct_NPV, by = "variable")
+
+```
+
+#Writing out discounted NPV files
+```{r include= FALSE}
+path <- './data/BaselineData/S0_OB_Inputs'
+
+write.csv(S0_FedRevOB_NPV, file.path(path, "S0_FedRevOB_NPV.csv"), row.names = TRUE)
+
+```
+
+#QC
+```{r include= FALSE}
+S0_FedRevOB_dis2pct_NPV <- sum(S0_FedRevOB_NPV$dis2pct)
+S0_FedRevOB_dis3pct_NPV <- sum(S0_FedRevOB_NPV$dis3pct)
+S0_FedRevOB_dis7pct_NPV <- sum(S0_FedRevOB_NPV$dis7pct)
+
+S0_FedRevOB_dis2pct_NPV
+S0_FedRevOB_dis3pct_NPV
+S0_FedRevOB_dis7pct_NPV
+```

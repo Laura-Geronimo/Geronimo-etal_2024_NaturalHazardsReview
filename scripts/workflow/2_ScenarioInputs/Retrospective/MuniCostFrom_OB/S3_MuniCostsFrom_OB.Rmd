@@ -1,0 +1,369 @@
+---
+title: "S3_MuniCostFomOB_Table"
+author: "Laura Geronimo"
+date: "2024-08-29"
+output: html_document
+---
+The purpose of this worksheet is to estimate the NPV for costs to Toms River for Scenario 2. We discount the costs and group them into buckets for analysis.
+
+We discount at 2%, 3%, 6%, and 7% based on justifications provided in the SI.
+
+Assumptions:
+-Public works for OB line drops by 23% after 2012, proportional to local road network removed
+-Public safety line for OB drops by 23% after 2012, proportional to housing units relocated (proxy for people relocated)
+-School district line for OB drops by 23% after 2012, proportional to housing units relocated (proxy for school children relocated)
+-Municipal cost share for federal response and recovery (assume sticky expenditure)
+-Municipal cost share for beach nourishment (assume sticky expenditure)
+
+-Municipal cost share for buyouts = 25% of market price for 421 bought out homes
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+#Importing data
+```{r include=FALSE}
+
+getwd()
+setwd('C:/Users/lgero/Box/Research/NJSG/Tradeoff_Analysis/V4')
+
+#libraries ####
+library(tidyverse)
+library(networkD3)
+library(dplyr)
+library(data.table)
+library(stringr)
+library(readxl)
+library(purrr)
+
+options(scipen=999)
+
+
+##Importing Data ####
+MuniCostOB <- read.csv('./data/BaselineData/S1_OB_Inputs/Costs_ToTR_fromOB/MuniCostOB.csv')
+MuniCostOB <- MuniCostOB[,c(-1)]
+
+OB_S3_2011_SP <- read.csv('./data/BaselineData/OB_MOD4_Produced/TimeSeries/S3/OB_S3_2011_SalesPrice.csv')
+Adjust <- read.csv('./data/BaselineData/InflationAdjusters.csv')
+
+
+```
+
+
+# Reducing public works, public safety, and school expenditures post 2012 by 23% (proportional to properties bought out and road network removed). Retaining 77%
+```{r include = FALSE}
+
+S3_MuniCostOB <- MuniCostOB
+S3_MuniCostOB$OB_Public_Works_adj[S3_MuniCostOB$Year > 2012] <- 
+  S3_MuniCostOB$OB_Public_Works_adj[S3_MuniCostOB$Year > 2012] * 0.77
+S3_MuniCostOB$OB_Public_Safety_adj[S3_MuniCostOB$Year > 2012] <- 
+  S3_MuniCostOB$OB_Public_Safety_adj[S3_MuniCostOB$Year > 2012] * 0.77
+S3_MuniCostOB$OB_SchoolExpend_adj[S3_MuniCostOB$Year > 2012] <- 
+  S3_MuniCostOB$OB_SchoolExpend_adj[S3_MuniCostOB$Year > 2012] * 0.77
+
+```
+
+# Calculating municipal cost share for Buyouts (25 % of market price for 421 homes)
+```{r include= FALSE}
+#subset estimated sales price to the winzorized estimates
+OB_S3_2011_SP <- OB_S3_2011_SP[,c("SalesPrice_LG_W")]
+
+#obtain total sales price value in Ortley Beach
+OB_S3_2011_SP_Tot <- sum(OB_S3_2011_SP)
+
+
+#adjusting by CPI to 2020 USD
+y11_CPI_multiplier <- Adjust$CPI_Multiplier_USD2020[Adjust$Year==2011]
+
+OB_S3_2011_SP_Tot_adj <- OB_S3_2011_SP_Tot * y11_CPI_multiplier
+
+#obtaining local share of buyout cost (25% cost share)
+OB_LocalShare_BuyoutCost_adj <- OB_S3_2011_SP_Tot_adj * 0.25
+
+#Adding buyout costs to data frame 
+S3_MuniCostOB$OB_LocalShare_BuyoutCost_adj[S3_MuniCostOB$Year==2012] <- OB_LocalShare_BuyoutCost_adj
+```
+
+
+#Discounting values to 2%, summing to NPV, and grouping in buckets
+```{r include=FALSE}
+
+###discounting flows at 2% ####
+#Creating a year index 
+S3_MuniCostOB$YearIndex <- 0:10
+
+#Define the function for discounting flows by 2% 
+dis2pct <- function(df, amount_cols, year_index_col, discount_rate = 0.02, base_year = 0) {
+  for (col in amount_cols) {
+    discounted_col_name <- paste0(col, "_dis2pct")
+    df[[discounted_col_name]] <- df[[col]] / ((1 + discount_rate) ^ (df[[year_index_col]] - base_year))
+  }
+  return(df)
+}
+
+# List of columns to discount - select colums starting with OB 
+amount_cols <-  grep("^OB_", colnames(S3_MuniCostOB), value = TRUE)
+
+# Apply the discount function
+S3_MuniCostOB_dis2pct <- dis2pct(S3_MuniCostOB, amount_cols, year_index_col = "YearIndex")
+
+# Remove undiscounted columns
+S3_MuniCostOB_dis2pct <- S3_MuniCostOB_dis2pct %>%
+  select(Year, YearIndex, ends_with("_dis2pct"))
+
+###Summing to NPV ####
+#Create a new data frame that sums the discounted columns for NPV (2020USD)
+S3_MuniCostOB_dis2pct_NPV <- S3_MuniCostOB_dis2pct %>%
+  summarise(across(ends_with("_dis2pct"), sum, na.rm = TRUE))
+
+###creating buckets ####
+#Summing Muni Share for Response and Recovery
+S3_MuniCostOB_dis2pct_NPV<- S3_MuniCostOB_dis2pct_NPV %>%
+  mutate(OB_LocalShare_ResponseRecovery_adj_dis2pct= 
+           OB_LocalShare_HMGP_adj_dis2pct +
+           OB_LocalShare_PA_Debris_adj_dis2pct +
+           OB_LocalShare_PA_Protect_adj_dis2pct +
+           OB_LocalShare_PA_PublicBuildings_adj_dis2pct +
+           OB_LocalShare_PA_PublicUtilities_adj_dis2pct +
+           OB_LocalShare_PA_Recreational_adj_dis2pct)
+  
+#selecting variables
+S3_MuniCostOB_dis2pct_NPV <- S3_MuniCostOB_dis2pct_NPV %>%
+  select(OB_Public_Safety_adj_dis2pct,
+         OB_Public_Works_adj_dis2pct,
+         OB_SchoolExpend_adj_dis2pct,
+         OB_LocalShare_ResponseRecovery_adj_dis2pct,
+         OB_LocalShare_BeachNourish_adj_dis2pct,
+         OB_LocalShare_BuyoutCost_adj_dis2pct)
+
+#pivoting tables longer
+S3_MuniCostOB_dis2pct_NPV <- S3_MuniCostOB_dis2pct_NPV %>%
+  pivot_longer(
+    cols = everything(),      # Pivot all columns
+    names_to = "variable",     # New column with variable names
+    values_to = "dis2pct"      # New column with the values
+  ) %>%
+  mutate(variable = sub("_dis2pct", "", variable)) 
+```
+
+
+#Discounting values to 3%, summing to NPV, and grouping in buckets
+```{r include=FALSE}
+
+###discounting flows at 3% ####
+#Creating a year index 
+S3_MuniCostOB$YearIndex <- 0:10
+
+#Define the function for discounting flows by 3% 
+dis3pct <- function(df, amount_cols, year_index_col, discount_rate = 0.03, base_year = 0) {
+  for (col in amount_cols) {
+    discounted_col_name <- paste0(col, "_dis3pct")
+    df[[discounted_col_name]] <- df[[col]] / ((1 + discount_rate) ^ (df[[year_index_col]] - base_year))
+  }
+  return(df)
+}
+
+# List of columns to discount - select colums starting with OB 
+amount_cols <-  grep("^OB_", colnames(S3_MuniCostOB), value = TRUE)
+
+# Apply the discount function
+S3_MuniCostOB_dis3pct <- dis3pct(S3_MuniCostOB, amount_cols, year_index_col = "YearIndex")
+
+# Remove undiscounted columns
+S3_MuniCostOB_dis3pct <- S3_MuniCostOB_dis3pct %>%
+  select(Year, YearIndex, ends_with("_dis3pct"))
+
+###Summing to NPV ####
+#Create a new data frame that sums the discounted columns for NPV (3030USD)
+S3_MuniCostOB_dis3pct_NPV <- S3_MuniCostOB_dis3pct %>%
+  summarise(across(ends_with("_dis3pct"), sum, na.rm = TRUE))
+
+###creating buckets ####
+#Summing Muni Share for Response and Recovery
+S3_MuniCostOB_dis3pct_NPV<- S3_MuniCostOB_dis3pct_NPV %>%
+  mutate(OB_LocalShare_ResponseRecovery_adj_dis3pct= 
+           OB_LocalShare_HMGP_adj_dis3pct +
+           OB_LocalShare_PA_Debris_adj_dis3pct +
+           OB_LocalShare_PA_Protect_adj_dis3pct +
+           OB_LocalShare_PA_PublicBuildings_adj_dis3pct +
+           OB_LocalShare_PA_PublicUtilities_adj_dis3pct +
+           OB_LocalShare_PA_Recreational_adj_dis3pct)
+  
+#selecting variables
+S3_MuniCostOB_dis3pct_NPV <- S3_MuniCostOB_dis3pct_NPV %>%
+  select(OB_Public_Safety_adj_dis3pct,
+         OB_Public_Works_adj_dis3pct,
+         OB_SchoolExpend_adj_dis3pct,
+         OB_LocalShare_ResponseRecovery_adj_dis3pct,
+         OB_LocalShare_BeachNourish_adj_dis3pct,
+         OB_LocalShare_BuyoutCost_adj_dis3pct)
+
+#pivoting tables longer
+S3_MuniCostOB_dis3pct_NPV <- S3_MuniCostOB_dis3pct_NPV %>%
+  pivot_longer(
+    cols = everything(),      # Pivot all columns
+    names_to = "variable",     # New column with variable names
+    values_to = "dis3pct"      # New column with the values
+  ) %>%
+  mutate(variable = sub("_dis3pct", "", variable)) 
+```
+
+
+
+#Discounting values to 6%, summing to NPV, and grouping in buckets
+```{r include=FALSE}
+
+###discounting flows at 6% ####
+#Creating a year index 
+S3_MuniCostOB$YearIndex <- 0:10
+
+#Define the function for discounting flows by 6% 
+dis6pct <- function(df, amount_cols, year_index_col, discount_rate = 0.06, base_year = 0) {
+  for (col in amount_cols) {
+    discounted_col_name <- paste0(col, "_dis6pct")
+    df[[discounted_col_name]] <- df[[col]] / ((1 + discount_rate) ^ (df[[year_index_col]] - base_year))
+  }
+  return(df)
+}
+
+# List of columns to discount - select colums starting with OB 
+amount_cols <-  grep("^OB_", colnames(S3_MuniCostOB), value = TRUE)
+
+# Apply the discount function
+S3_MuniCostOB_dis6pct <- dis6pct(S3_MuniCostOB, amount_cols, year_index_col = "YearIndex")
+
+# Remove undiscounted columns
+S3_MuniCostOB_dis6pct <- S3_MuniCostOB_dis6pct %>%
+  select(Year, YearIndex, ends_with("_dis6pct"))
+
+###Summing to NPV ####
+#Create a new data frame that sums the discounted columns for NPV (6060USD)
+S3_MuniCostOB_dis6pct_NPV <- S3_MuniCostOB_dis6pct %>%
+  summarise(across(ends_with("_dis6pct"), sum, na.rm = TRUE))
+
+###creating buckets ####
+#Summing Muni Share for Response and Recovery
+S3_MuniCostOB_dis6pct_NPV<- S3_MuniCostOB_dis6pct_NPV %>%
+  mutate(OB_LocalShare_ResponseRecovery_adj_dis6pct= 
+           OB_LocalShare_HMGP_adj_dis6pct +
+           OB_LocalShare_PA_Debris_adj_dis6pct +
+           OB_LocalShare_PA_Protect_adj_dis6pct +
+           OB_LocalShare_PA_PublicBuildings_adj_dis6pct +
+           OB_LocalShare_PA_PublicUtilities_adj_dis6pct +
+           OB_LocalShare_PA_Recreational_adj_dis6pct)
+  
+#selecting variables
+S3_MuniCostOB_dis6pct_NPV <- S3_MuniCostOB_dis6pct_NPV %>%
+  select(OB_Public_Safety_adj_dis6pct,
+         OB_Public_Works_adj_dis6pct,
+         OB_SchoolExpend_adj_dis6pct,
+         OB_LocalShare_ResponseRecovery_adj_dis6pct,
+         OB_LocalShare_BeachNourish_adj_dis6pct,
+         OB_LocalShare_BuyoutCost_adj_dis6pct)
+
+#pivoting tables longer
+S3_MuniCostOB_dis6pct_NPV <- S3_MuniCostOB_dis6pct_NPV %>%
+  pivot_longer(
+    cols = everything(),      # Pivot all columns
+    names_to = "variable",     # New column with variable names
+    values_to = "dis6pct"      # New column with the values
+  ) %>%
+  mutate(variable = sub("_dis6pct", "", variable)) 
+```
+
+
+
+#Discounting values to 7%, summing to NPV, and grouping in buckets
+```{r include=FALSE}
+
+###discounting flows at 7% ####
+#Creating a year index 
+S3_MuniCostOB$YearIndex <- 0:10
+
+#Define the function for discounting flows by 7% 
+dis7pct <- function(df, amount_cols, year_index_col, discount_rate = 0.07, base_year = 0) {
+  for (col in amount_cols) {
+    discounted_col_name <- paste0(col, "_dis7pct")
+    df[[discounted_col_name]] <- df[[col]] / ((1 + discount_rate) ^ (df[[year_index_col]] - base_year))
+  }
+  return(df)
+}
+
+# List of columns to discount - select colums starting with OB 
+amount_cols <-  grep("^OB_", colnames(S3_MuniCostOB), value = TRUE)
+
+# Apply the discount function
+S3_MuniCostOB_dis7pct <- dis7pct(S3_MuniCostOB, amount_cols, year_index_col = "YearIndex")
+
+# Remove undiscounted columns
+S3_MuniCostOB_dis7pct <- S3_MuniCostOB_dis7pct %>%
+  select(Year, YearIndex, ends_with("_dis7pct"))
+
+###Summing to NPV ####
+#Create a new data frame that sums the discounted columns for NPV (7070USD)
+S3_MuniCostOB_dis7pct_NPV <- S3_MuniCostOB_dis7pct %>%
+  summarise(across(ends_with("_dis7pct"), sum, na.rm = TRUE))
+
+###creating buckets ####
+#Summing Muni Share for Response and Recovery
+S3_MuniCostOB_dis7pct_NPV<- S3_MuniCostOB_dis7pct_NPV %>%
+  mutate(OB_LocalShare_ResponseRecovery_adj_dis7pct= 
+           OB_LocalShare_HMGP_adj_dis7pct +
+           OB_LocalShare_PA_Debris_adj_dis7pct +
+           OB_LocalShare_PA_Protect_adj_dis7pct +
+           OB_LocalShare_PA_PublicBuildings_adj_dis7pct +
+           OB_LocalShare_PA_PublicUtilities_adj_dis7pct +
+           OB_LocalShare_PA_Recreational_adj_dis7pct)
+  
+#selecting variables
+S3_MuniCostOB_dis7pct_NPV <- S3_MuniCostOB_dis7pct_NPV %>%
+  select(OB_Public_Safety_adj_dis7pct,
+         OB_Public_Works_adj_dis7pct,
+         OB_SchoolExpend_adj_dis7pct,
+         OB_LocalShare_ResponseRecovery_adj_dis7pct,
+         OB_LocalShare_BeachNourish_adj_dis7pct,
+         OB_LocalShare_BuyoutCost_adj_dis7pct)
+
+#pivoting tables longer
+S3_MuniCostOB_dis7pct_NPV <- S3_MuniCostOB_dis7pct_NPV %>%
+  pivot_longer(
+    cols = everything(),      # Pivot all columns
+    names_to = "variable",     # New column with variable names
+    values_to = "dis7pct"      # New column with the values
+  ) %>%
+  mutate(variable = sub("_dis7pct", "", variable)) 
+```
+
+
+#Joining data for export
+```{r include = FALSE}
+#pivoting tables longer
+S3_MuniCostOB_NPV <- S3_MuniCostOB_dis2pct_NPV %>%
+  left_join(S3_MuniCostOB_dis3pct_NPV, by = "variable") %>%
+  left_join(S3_MuniCostOB_dis6pct_NPV, by = "variable") %>%
+  left_join(S3_MuniCostOB_dis7pct_NPV, by = "variable")
+
+```
+
+#Writing out discounted NPV files
+```{r include= FALSE}
+path <- './data/BaselineData/S3_OB_Inputs'
+
+write.csv(S3_MuniCostOB_NPV, file.path(path, "S3_MuniCostOB_NPV.csv"), row.names = TRUE)
+
+```
+
+#QC
+```{r include= FALSE}
+S3_MuniCostOB_dis2pct_NPV <- sum(S3_MuniCostOB_NPV$dis2pct)
+S3_MuniCostOB_dis3pct_NPV <- sum(S3_MuniCostOB_NPV$dis3pct)
+S3_MuniCostOB_dis6pct_NPV <- sum(S3_MuniCostOB_NPV$dis6pct)
+S3_MuniCostOB_dis7pct_NPV <- sum(S3_MuniCostOB_NPV$dis7pct)
+
+S3_MuniCostOB_dis2pct_NPV
+S3_MuniCostOB_dis3pct_NPV
+S3_MuniCostOB_dis6pct_NPV
+S3_MuniCostOB_dis7pct_NPV
+```

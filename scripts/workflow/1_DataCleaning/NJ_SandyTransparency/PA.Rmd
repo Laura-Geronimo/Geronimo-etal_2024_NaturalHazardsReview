@@ -1,0 +1,252 @@
+---
+title: "NJST: FEMA Public Assistance Program Overview"
+author: "Laura Geronimo"
+date: '2024-08-23'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r include=FALSE}
+
+getwd()
+setwd('C:/Users/lgero/Box/Research/NJSG/Tradeoff_Analysis/V4')
+
+#libraries ####
+library(tidyverse)
+library(networkD3)
+library(dplyr)
+library(data.table)
+library(stringr)
+
+options(scipen=999)
+
+##Importing Data
+PA <- read.csv('./data/DataDownloads/NJ_SandyTransparencyData/State_Agency_Datasets/Sandy_PA_Master_Data.csv')
+
+## Explore####
+colSums(is.na(PA))
+table(PA$Project)
+
+#Workflow:
+#########PART 1: Data subset and processing: CPI Adjustments
+#Subset data to Ocean County
+#Extract Year from a suitable category using library stringr (see example code below)
+#create dataframe for CPI Adjustments (year and CPI - see sample code)
+#join to your Ocean County dataframe by year (this will integrate CPI multipliers into Ocean county dataframe)
+#Create a new variable that reflects adjusted federal cost share (choose suitable variable like federal.distributed.amount, multiply the by the CPI value, and append 'Adj' to variable name --see sample code). Keep track of what values you use by using similar naming convention. (e.g. federal.distributed.amount.adj)
+#Create a new variable that reflects adjusted local cost share (choose suitable variable like local.share, multiply the by the CPI value, and append 'Adj' to variable name --see sample code). 
+#Spot check your dataframe to make sure that calculations completed
+
+#########PART 2: Redo links with CPI adjusted values. PA cumulative cost share by municipality (local and federal) by project type in Ocean County
+    #A. how much PA assistance (Federal Share Adj) went to each municipality by project type
+    #B. How much PA assistance (Local Share Adj)  went to each municipality by project type
+
+#########PART 3: Obtain generalized costs by unit using assumptions- WORKING on Method
+#Note that I am still working on the methodology for select projects
+#Subset to Countywide and Toms River to start
+#for Toms River, if the project is related to buildings, divide by 9651 (estimate of residential properties affected by Sandy storm surge)
+#for Toms River, if the project is related to roads, divide by 134 (estimate of number of miles of roadway affected by Sandy storm surge)
+```
+
+### Part 1: Data subset and processing: CPI Adjustments
+```{r, include=FALSE}
+#subset to Ocean County or Toms River (depending on complexity of your data and ease of processing)
+table(is.na(PA$County))
+table(is.na(PA$Municipality))
+PA_Ocean <- subset(PA, County=="OCEAN")
+PA_TR <- subset(PA, Municipality=="TOMS RIVER TOWNSHIP")
+
+#examine missing data
+colSums(is.na(PA_Ocean)) 
+colSums(is.na(PA_TR))
+
+#extracting year
+PA_Ocean$Disbursed.Year <- sub(".*(.{4})$", "\\1", PA_Ocean$Federal.Disbursed.Date)
+table(PA_Ocean$Disbursed.Year) #missing year on 73/637 projects. Ignore for now.
+class(PA_Ocean$Disbursed.Year)
+PA_Ocean$Disbursed.Year <- as.numeric(PA_Ocean$Disbursed.Year) #needs to be compatible class for join
+
+#creating dataframe for CPI Adjustments
+##adjusting for Inflation####
+Disbursed.Year<- c(2011,2012,2013,2014,2015,2016,2017,2018,2019,2020,2021,2022,2023)
+CPI <-c(1.17,1.14,1.12,1.10,1.10,1.09,1.06,1.04,1.02,1.00,0.99,0.92,0.86)
+CPI  <- data.frame(Disbursed.Year, CPI)
+class(CPI$Disbursed.Year)
+
+#join CPI multipliers to Ocean dataframe by year var
+PA_Ocean<-left_join(PA_Ocean, CPI, by="Disbursed.Year", copy=F)
+colSums(is.na(PA_Ocean))
+
+##multiply the $ amounts you are using in links by CPI and create new var, append 'adj' to var
+PA_Ocean$Federal.Disbursed.Amount.Adj <- PA_Ocean$Federal.Disbursed.Amount * PA_Ocean$CPI
+PA_Ocean$Local.Share.Adj <- PA_Ocean$Local.Share * PA_Ocean$CPI
+
+#Spot Check:
+QC1<-sum(PA_Ocean$Federal.Disbursed.Amount, na.rm=T)
+QC2<-sum(PA_Ocean$Federal.Disbursed.Amount.Adj, na.rm=T) #should be greater than QC1
+QC3<-QC2-QC1 #looks like it processed
+
+QC1<-sum(PA_Ocean$Local.Share, na.rm=T)
+QC2<-sum(PA_Ocean$Local.Share.Adj, na.rm=T) #should be greater than QC1
+QC3<-QC2-QC1 #looks like it processed
+
+
+```
+
+
+## Part 2: Redo links with CPI adjusted values.
+## Part 2:A: PA cumulative cost share ADJUSTED by municipality (local and federal) by project type in Ocean County
+### Part 2.A: PA Assistance (Federal Cost Share Adjusted) by Municipality by Project Type in Ocean County
+```{r, include=FALSE}
+#Q2.A: PA_OCEAN adjusted Federal cost share by Project by Municipality
+
+# 2.A.1. nodes --------------------------------------------------------------------
+names(PA_Ocean)
+
+sankey_nodes2A <- list(
+  PA_Ocean %>% select(5) %>% unique,          #Node 1 #Project / program / bucket
+  PA_Ocean %>% select(9) %>% unique) %>%      #Node 2 #Municipality
+  unlist(use.names = F) %>% 
+  unique()
+# 
+sankey_nodes2A <- sankey_nodes2A %>% data.frame(names = .)
+
+sankey_nodes2A_df <- sankey_nodes2A %>% 
+  mutate(node_id = 0:(nrow(sankey_nodes2A)-1))
+
+# 2.A.2.  Links ADJUSTED-------------------------------------------------------------
+names(PA_Ocean)
+
+link_2A <- PA_Ocean %>% 
+  select(`Project`, Municipality, `Federal.Disbursed.Amount.Adj`) %>% #Use Adjusted version
+  group_by(`Project`, Municipality) %>% 
+  summarise(value=sum(`Federal.Disbursed.Amount.Adj`,na.rm = T))%>% 
+  ungroup()
+names(link_2A) <- c('names_src','names_tgt','Federal.Disbursed.Amount.Adj') #keep naming convention for tracking
+
+# 2.A.3. Merging nodes in links
+#getting source and target numbers in 
+link_2A <- left_join(link_2A, sankey_nodes2A_df, by=c("names_src"= "names"), copy=F)
+link_2A <- left_join(link_2A, sankey_nodes2A_df, by=c("names_tgt"= "names"), copy=F)
+
+names(link_2A)
+names(link_2A) <- c('names_src','names_tgt','Federal.Disbursed.Amount.Adj', 'source', 'target')
+```
+
+```{r echo=FALSE,  message=FALSE, warning=FALSE}
+# 2.A.4. Visualization --------------------------------------------------------
+
+p2A <- sankeyNetwork(Links = link_2A, 
+                   Nodes = sankey_nodes2A_df, 
+                   Source = "source", Target = "target", Value = "Federal.Disbursed.Amount.Adj", 
+                   NodeID = "names",
+                   units = "$", fontSize = 12, nodeWidth = 30,
+                   iterations= 0)
+p2A
+```
+
+### Part 2.B: PA Assistance (Local Cost Share ADJUSTED) by Municipality by Project Type in Ocean County
+
+```{r, include=FALSE}
+
+#Q2.B: PA_OCEAN by Project by Municipality
+
+# 2.B.1. nodes --------------------------------------------------------------------
+names(PA_Ocean)
+
+sankey_nodes2B <- list(
+  PA_Ocean %>% select(5) %>% unique,     #Node 1: Project / program / bucket
+  PA_Ocean %>% select(9) %>% unique) %>% #Node 2: Municipality
+  unlist(use.names = F) %>% 
+  unique()
+# 
+sankey_nodes2B <- sankey_nodes2B %>% data.frame(names = .)
+
+sankey_nodes2B_df <- sankey_nodes2B %>% 
+  mutate(node_id = 0:(nrow(sankey_nodes2B)-1))
+
+# 2.B.2.  Links -------------------------------------------------------------
+names(PA_Ocean)
+
+link_2B <- PA_Ocean %>% 
+  select(`Project`, Municipality, `Local.Share.Adj`) %>%  #change to CPI Adjusted Value
+  group_by(`Project`, Municipality) %>% 
+  summarise(value=sum(`Local.Share.Adj`,na.rm = T))%>% 
+  ungroup()
+names(link_2B) <- c('names_src','names_tgt','Local.Share.Adj') #keep naming convention for tracking
+
+# 2.B.3. Merging nodes in links
+#getting source and target numbers in 
+link_2B <- left_join(link_2B, sankey_nodes2B_df, by=c("names_src"= "names"), copy=F)
+link_2B <- left_join(link_2B, sankey_nodes2B_df, by=c("names_tgt"= "names"), copy=F)
+
+names(link_2B)
+names(link_2B) <- c('names_src','names_tgt','Local.Share.Adj', 'source', 'target')
+```
+
+```{r echo=FALSE,  message=FALSE, warning=FALSE}
+# 2.B.4. Visualization --------------------------------------------------------
+
+p2B <- sankeyNetwork(Links = link_2B, 
+                   Nodes = sankey_nodes2B_df, 
+                   Source = "source", Target = "target", Value = "Local.Share.Adj", 
+                   NodeID = "names",
+                   units = "$", fontSize = 12, nodeWidth = 30,
+                   iterations= 0)
+p2B
+```
+
+### Part 3: Obtain generalized costs by unit using assumptions- WORKING
+```{r include=FALSE}
+#Subset to Countywide and Toms River to start. 
+#for Toms River, if the project is related to buildings, divide by 9651 (estimate of residential properties affected by Sandy storm surge)
+#for Toms River, if the project is related to roads, divide by 134 (estimate of number of miles of roadway affected by Sandy storm surge)
+
+FedShareOcean <- subset(link_2A, names_tgt=="COUNTYWIDE")
+FedShareTR <- subset(link_2A, names_tgt=="TOMS RIVER TOWNSHIP")
+FedShareTR$Federal.Disbursed.Amount.Adj.PerHU <- FedShareTR$Federal.Disbursed.Amount.Adj / 9651
+FedShareTR$Federal.Disbursed.Amount.Adj.PerMile <- FedShareTR$Federal.Disbursed.Amount.Adj / 134
+
+LocalShareOcean <- subset(link_2B, names_tgt=="COUNTYWIDE")
+LocalShareTR <- subset(link_2B, names_tgt=="TOMS RIVER TOWNSHIP")
+LocalShareTR$Local.Share.Adj.PerHU <- LocalShareTR$Local.Share.Adj / 9651
+LocalShareTR$Local.Share.Adj.PerHUPerMile <- LocalShareTR$Local.Share.Adj / 134
+
+```
+
+#Creating a subset for Toms River by Year 
+##Federal Cost Share by year
+```{r include=FALSE}
+PA_TR <- subset(PA_Ocean, Municipality=="TOMS RIVER TOWNSHIP")
+PA_TR_FederalShare_ByYear <- PA_TR %>% 
+  select(`Project`, Disbursed.Year, `Federal.Disbursed.Amount.Adj`) %>% #Use Adjusted version
+  group_by(`Project`, Disbursed.Year) %>% 
+  summarise(value=sum(`Federal.Disbursed.Amount.Adj`,na.rm = T))%>% 
+  ungroup()
+
+names(PA_TR_FederalShare_ByYear) <- c('Project','Disbursed.Year','Federal.Disbursed.Amount.Adj')
+PA_TR_FederalShare_ByYear <- na.omit(PA_TR_FederalShare_ByYear)
+
+path <- 'C:/Users/lgero/Box/Research/NJSG/Tradeoff_Analysis/V4/data/BaselineData/NJ_SandyTransparencey_produced'
+write.csv(PA_TR_FederalShare_ByYear, file.path(path, "PA_TR_FederalShare_ByYear.csv"), row.names = TRUE)
+```
+
+##Local Cost Share
+```{r include=FALSE}
+PA_TR <- subset(PA_Ocean, Municipality=="TOMS RIVER TOWNSHIP")
+PA_TR_LocalShare_ByYear <- PA_TR %>% 
+  select(`Project`, Disbursed.Year, `Local.Share.Adj`) %>% #Use Adjusted version
+  group_by(`Project`, Disbursed.Year) %>% 
+  summarise(value=sum(`Local.Share.Adj`,na.rm = T))%>% 
+  ungroup()
+
+names(PA_TR_LocalShare_ByYear) <- c('Project','Disbursed.Year','Local.Share.Adj')
+PA_TR_LocalShare_ByYear <- na.omit(PA_TR_LocalShare_ByYear)
+
+
+path <- 'C:/Users/lgero/Box/Research/NJSG/Tradeoff_Analysis/V4/data/BaselineData/NJ_SandyTransparencey_produced'
+write.csv(PA_TR_LocalShare_ByYear, file.path(path, "PA_TR_LocalShare_ByYear.csv"), row.names = TRUE)
+```

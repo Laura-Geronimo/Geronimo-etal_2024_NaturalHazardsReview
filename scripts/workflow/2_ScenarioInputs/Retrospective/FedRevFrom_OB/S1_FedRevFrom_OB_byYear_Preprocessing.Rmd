@@ -1,0 +1,97 @@
+---
+title: "Federal Revenues from Ortley Beach"
+author: "Laura Geronimo"
+date: "2024-08-23"
+output: html_document
+---
+The purpose of this worksheet is to estimate the benefits to the Federal Government originating from properties on Ortley Beach for Scenario 1 (replicating the historical record). Benefits are estimated for the 2012-2022 period. 
+
+We only estimate benefits from NFIP premiums.
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+#Importing data
+```{r include=FALSE}
+
+getwd()
+setwd('C:/Users/lgero/Box/Research/NJSG/Tradeoff_Analysis/V4')
+
+#libraries ####
+library(tidyverse)
+library(networkD3)
+library(dplyr)
+library(data.table)
+library(stringr)
+library(readxl)
+library(purrr)
+
+options(scipen=999)
+
+##Importing Data ####
+NFIP_PolicyCost_08571 <- read.csv('./data/DataDownloads/NFIP/Policies/produced/ZCTA_08571/NFIP_PolicyData_08571.csv')
+
+#Data for downscaling
+OB_DemoData <- read_xlsx('./data/BaselineData/OrtleyBeach_DemographicData.xlsx', sheet=1)
+TR_DemoData <- read_xlsx('./data/BaselineData/TomsRiver_DemographicData.xlsx', sheet=1)
+ZCTA_DemoData <- read_xlsx('./data/BaselineData/ZCTA_08751_DemographicData.xlsx', sheet=1)
+
+TR_Sandy <- read_xlsx('./data/BaselineData/TomsRiver_SandyImpacts.xlsx', sheet=1)
+
+
+
+```
+
+
+
+##1) Downscaling NFIP policies data based on estimated proportion of housing units with policies in force
+```{r include=FALSE}
+#selecting colums for analysis
+NFIP_PolicyCost_08571 <- NFIP_PolicyCost_08571 %>% 
+  select("policyEffectiveYear",
+         "numberOfPolicies",
+         "AvePolicyCostAdj")
+
+#joining NFIP data to ZCTA demographic data
+ZCTA_NFIP <- left_join(ZCTA_DemoData, NFIP_PolicyCost_08571, by = c("Year" = "policyEffectiveYear"))
+
+#imputing 2021 and 2022 values based on averages
+ZCTA_NFIP$numberOfPolicies[ZCTA_NFIP$Year==2021] <- mean(ZCTA_NFIP$numberOfPolicies[ZCTA_NFIP$Year < 2021])
+ZCTA_NFIP$numberOfPolicies[ZCTA_NFIP$Year==2022] <- mean(ZCTA_NFIP$numberOfPolicies[ZCTA_NFIP$Year < 2021])
+
+ZCTA_NFIP$AvePolicyCostAdj[ZCTA_NFIP$Year==2021] <- mean(ZCTA_NFIP$AvePolicyCostAdj[ZCTA_NFIP$Year < 2021])
+ZCTA_NFIP$AvePolicyCostAdj[ZCTA_NFIP$Year==2022] <- mean(ZCTA_NFIP$AvePolicyCostAdj[ZCTA_NFIP$Year < 2021])
+
+#estimating proportion of housing units in force
+ZCTA_NFIP$PoliciesInForce_pct <- ZCTA_NFIP$numberOfPolicies / ZCTA_NFIP$Z_HU
+
+#joining Ortley Beach housing unit estimates
+OB_HU <- OB_DemoData %>%
+  select(Year,
+         OB_TotHU_E,
+         OB_TotHU_OwnOcc_E)
+
+OB_NFIP <- left_join(OB_HU, ZCTA_NFIP, by="Year")
+OB_NFIP <- OB_NFIP[OB_NFIP$Year > 2011,]
+
+#Downscaling amount of policy cost in Ortley Beach by proportion of homes with policies in force in ZCTA * total housing units in Ortley Beach
+OB_NFIP$OB_NFIP_PolicyCost_adj <- OB_NFIP$OB_TotHU_E * OB_NFIP$PoliciesInForce_pct * OB_NFIP$AvePolicyCostAdj
+
+#selecting columns
+OB_NFIP_PolicyCost_adj <- OB_NFIP %>%
+  select(Year,
+         OB_NFIP_PolicyCost_adj)
+
+```
+
+
+#Exporting S1 OB input tables :
+```{r include=FALSE}
+path <- 'C:/Users/lgero/Box/Research/NJSG/Tradeoff_Analysis/V4/data/BaselineData/S1_OB_Inputs/Revenues_ToFed_fromOB'
+
+write.csv(OB_NFIP_PolicyCost_adj, file.path(path, "S1_OB_FedRev_NFIP_PolicyCost_adj.csv"), row.names = TRUE)
+
+
+```

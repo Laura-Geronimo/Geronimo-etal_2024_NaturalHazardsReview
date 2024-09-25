@@ -1,0 +1,276 @@
+---
+title: "S1_FedCostsFrom_OB"
+author: "Laura Geronimo"
+date: "2024-09-13"
+output: html_document
+---
+
+The purpose of this worksheet is to estimate the NPV for costs to the Federal Government for Scenario 0. We discount the costs and group them into buckets for analysis.
+
+We discount at 2%, 3%, and 7% based on justifications provided in the SI.
+
+Simplifying Assumptions:
+-Federal Cost Share for Municipal Response and Recovery = NA (no Sandy)
+-Federal Cost Share for Individual Response and Recovery = NA (no Sandy)
+-Federal Cost Share for Repairs to Roads & Bridges = NA (no Sandy)
+-Federal Cost Share for Beach Nourishment = (2021 event only)
+-Federal NFIP Claims = Post- Sandy events only
+
+
+
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+#Importing data
+```{r include=FALSE}
+
+getwd()
+setwd('C:/Users/lgero/Box/Research/NJSG/Tradeoff_Analysis/V4')
+
+#libraries ####
+library(tidyverse)
+library(networkD3)
+library(dplyr)
+library(data.table)
+library(stringr)
+library(readxl)
+library(purrr)
+
+options(scipen=999)
+
+
+##Importing Data ####
+FedCostOB <- read.csv('./data/BaselineData/S1_OB_Inputs/Costs_ToFed_fromOB/FedCostOB.csv')
+FedCostOB  <- FedCostOB [,c(-1)]
+
+```
+
+
+#Adjusting baseline data per S0 simplifying assumptions
+-Federal Cost Share for Municipal Response and Recovery = NA (no Sandy)
+-Federal Cost Share for Individual Response and Recovery = NA (no Sandy)
+-Federal Cost Share for Repairs to Roads & Bridges = NA (no Sandy)
+-Federal Cost Share for Beach Nourishment = (2021 event only)
+-Federal NFIP Claims = Post- Sandy events only
+
+```{r include=FALSE}
+#dropping columns
+S0_FedCostOB <- FedCostOB %>%
+  select(Year,
+         OB_FedShare_BeachNourish_adj,
+         OB_NFIP_BuildingsClaims_adj,
+         OB_NFIP_ContentsClaims_adj,
+         OB_NFIP_ICCClaims_adj)
+
+#adjusting Beach nourishment event to 2021 only
+S0_FedCostOB$OB_FedShare_BeachNourish_adj[S0_FedCostOB$Year < 2021] <- NA
+
+#adjusting federal claims to post-sandy events only
+S0_FedCostOB$OB_NFIP_BuildingsClaims_adj[S0_FedCostOB$Year < 2013] <- NA
+S0_FedCostOB$OB_NFIP_ContentsClaims_adj[S0_FedCostOB$Year < 2013] <- NA
+S0_FedCostOB$OB_NFIP_ICCClaims_adj[S0_FedCostOB$Year < 2013] <- NA
+
+
+```
+
+
+
+#Discounting values to 2%, summing to NPV & grouping into buckets
+```{r include=FALSE}
+
+###discounting flows at 2% ####
+#Creating a year index 
+S0_FedCostOB$YearIndex <- 0:10
+
+#Define the function for discounting flows by 2% 
+dis2pct <- function(df, amount_cols, year_index_col, discount_rate = 0.02, base_year = 0) {
+  for (col in amount_cols) {
+    discounted_col_name <- paste0(col, "_dis2pct")
+    df[[discounted_col_name]] <- df[[col]] / ((1 + discount_rate) ^ (df[[year_index_col]] - base_year))
+  }
+  return(df)
+}
+
+# List of columns to discount - select colums starting with OB 
+amount_cols <-  grep("^OB_", colnames(S0_FedCostOB), value = TRUE)
+
+# Apply the discount function
+S0_FedCostOB_dis2pct <- dis2pct(S0_FedCostOB, amount_cols, year_index_col = "YearIndex")
+
+# Remove undiscounted columns
+S0_FedCostOB_dis2pct <- S0_FedCostOB_dis2pct %>%
+  select(Year, YearIndex, ends_with("_dis2pct"))
+
+###Summing to NPV ####
+#Create a new data frame that sums the discounted columns for NPV (2020USD)
+S0_FedCostOB_dis2pct_NPV <- S0_FedCostOB_dis2pct %>%
+  summarise(across(ends_with("_dis2pct"), sum, na.rm = TRUE))
+
+###creating buckets ####
+#Summing Fed Share for NFIP claims
+S0_FedCostOB_dis2pct_NPV  <- S0_FedCostOB_dis2pct_NPV  %>%
+  mutate(OB_FedShare_NFIP_dis2pct=
+           OB_NFIP_BuildingsClaims_adj_dis2pct +
+           OB_NFIP_ContentsClaims_adj_dis2pct +
+           OB_NFIP_ICCClaims_adj_dis2pct)
+  
+#selecting variables
+S0_FedCostOB_dis2pct_NPV  <- S0_FedCostOB_dis2pct_NPV %>%
+  select(OB_FedShare_BeachNourish_adj_dis2pct,
+         OB_FedShare_NFIP_dis2pct)
+
+#pivoting tables longer
+S0_FedCostOB_dis2pct_NPV <- S0_FedCostOB_dis2pct_NPV %>%
+  pivot_longer(
+    cols = everything(),      # Pivot all columns
+    names_to = "variable",     # New column with variable names
+    values_to = "dis2pct"      # New column with the values
+  ) %>%
+  mutate(variable = sub("_dis2pct", "", variable)) 
+```
+
+
+
+#Discounting values to 3%, summing to NPV & grouping into buckets
+```{r include=FALSE}
+
+###discounting flows at 3% ####
+#Creating a year index 
+S0_FedCostOB$YearIndex <- 0:10
+
+#Define the function for discounting flows by 3% 
+dis3pct <- function(df, amount_cols, year_index_col, discount_rate = 0.03, base_year = 0) {
+  for (col in amount_cols) {
+    discounted_col_name <- paste0(col, "_dis3pct")
+    df[[discounted_col_name]] <- df[[col]] / ((1 + discount_rate) ^ (df[[year_index_col]] - base_year))
+  }
+  return(df)
+}
+
+# List of columns to discount - select colums starting with OB 
+amount_cols <-  grep("^OB_", colnames(S0_FedCostOB), value = TRUE)
+
+# Apply the discount function
+S0_FedCostOB_dis3pct <- dis3pct(S0_FedCostOB, amount_cols, year_index_col = "YearIndex")
+
+# Remove undiscounted columns
+S0_FedCostOB_dis3pct <- S0_FedCostOB_dis3pct %>%
+  select(Year, YearIndex, ends_with("_dis3pct"))
+
+###Summing to NPV ####
+#Create a new data frame that sums the discounted columns for NPV (2020USD)
+S0_FedCostOB_dis3pct_NPV <- S0_FedCostOB_dis3pct %>%
+  summarise(across(ends_with("_dis3pct"), sum, na.rm = TRUE))
+
+###creating buckets ####
+#Summing Fed Share for NFIP claims
+S0_FedCostOB_dis3pct_NPV  <- S0_FedCostOB_dis3pct_NPV  %>%
+  mutate(OB_FedShare_NFIP_dis3pct=
+           OB_NFIP_BuildingsClaims_adj_dis3pct +
+           OB_NFIP_ContentsClaims_adj_dis3pct +
+           OB_NFIP_ICCClaims_adj_dis3pct)
+  
+#selecting variables
+S0_FedCostOB_dis3pct_NPV  <- S0_FedCostOB_dis3pct_NPV %>%
+  select(OB_FedShare_BeachNourish_adj_dis3pct,
+         OB_FedShare_NFIP_dis3pct)
+
+#pivoting tables longer
+S0_FedCostOB_dis3pct_NPV <- S0_FedCostOB_dis3pct_NPV %>%
+  pivot_longer(
+    cols = everything(),      # Pivot all columns
+    names_to = "variable",     # New column with variable names
+    values_to = "dis3pct"      # New column with the values
+  ) %>%
+  mutate(variable = sub("_dis3pct", "", variable)) 
+```
+
+
+
+
+#Discounting values to 7%, summing to NPV & grouping into buckets
+```{r include=FALSE}
+
+###discounting flows at 7% ####
+#Creating a year index 
+S0_FedCostOB$YearIndex <- 0:10
+
+#Define the function for discounting flows by 7% 
+dis7pct <- function(df, amount_cols, year_index_col, discount_rate = 0.07, base_year = 0) {
+  for (col in amount_cols) {
+    discounted_col_name <- paste0(col, "_dis7pct")
+    df[[discounted_col_name]] <- df[[col]] / ((1 + discount_rate) ^ (df[[year_index_col]] - base_year))
+  }
+  return(df)
+}
+
+# List of columns to discount - select colums starting with OB 
+amount_cols <-  grep("^OB_", colnames(S0_FedCostOB), value = TRUE)
+
+# Apply the discount function
+S0_FedCostOB_dis7pct <- dis7pct(S0_FedCostOB, amount_cols, year_index_col = "YearIndex")
+
+# Remove undiscounted columns
+S0_FedCostOB_dis7pct <- S0_FedCostOB_dis7pct %>%
+  select(Year, YearIndex, ends_with("_dis7pct"))
+
+###Summing to NPV ####
+#Create a new data frame that sums the discounted columns for NPV (2020USD)
+S0_FedCostOB_dis7pct_NPV <- S0_FedCostOB_dis7pct %>%
+  summarise(across(ends_with("_dis7pct"), sum, na.rm = TRUE))
+
+###creating buckets ####
+#Summing Fed Share for NFIP claims
+S0_FedCostOB_dis7pct_NPV  <- S0_FedCostOB_dis7pct_NPV  %>%
+  mutate(OB_FedShare_NFIP_dis7pct=
+           OB_NFIP_BuildingsClaims_adj_dis7pct +
+           OB_NFIP_ContentsClaims_adj_dis7pct +
+           OB_NFIP_ICCClaims_adj_dis7pct)
+  
+#selecting variables
+S0_FedCostOB_dis7pct_NPV  <- S0_FedCostOB_dis7pct_NPV %>%
+  select(OB_FedShare_BeachNourish_adj_dis7pct,
+         OB_FedShare_NFIP_dis7pct)
+
+#pivoting tables longer
+S0_FedCostOB_dis7pct_NPV <- S0_FedCostOB_dis7pct_NPV %>%
+  pivot_longer(
+    cols = everything(),      # Pivot all columns
+    names_to = "variable",     # New column with variable names
+    values_to = "dis7pct"      # New column with the values
+  ) %>%
+  mutate(variable = sub("_dis7pct", "", variable)) 
+```
+
+
+#Joining data for export
+```{r include = FALSE}
+#pivoting tables longer
+S0_FedCostOB_NPV <- S0_FedCostOB_dis2pct_NPV %>%
+  left_join(S0_FedCostOB_dis3pct_NPV, by = "variable") %>%
+  left_join(S0_FedCostOB_dis7pct_NPV, by = "variable")
+
+```
+
+#Writing out discounted NPV files
+```{r include= FALSE}
+path <- './data/BaselineData/S0_OB_Inputs'
+
+write.csv(S0_FedCostOB_NPV, file.path(path, "S0_FedCostOB_NPV.csv"), row.names = TRUE)
+
+```
+
+#QC
+```{r include= FALSE}
+S0_FedCostOB_dis2pct_NPV <- sum(S0_FedCostOB_NPV$dis2pct)
+S0_FedCostOB_dis3pct_NPV <- sum(S0_FedCostOB_NPV$dis3pct)
+S0_FedCostOB_dis7pct_NPV <- sum(S0_FedCostOB_NPV$dis7pct)
+
+S0_FedCostOB_dis2pct_NPV
+S0_FedCostOB_dis3pct_NPV
+S0_FedCostOB_dis7pct_NPV
+```

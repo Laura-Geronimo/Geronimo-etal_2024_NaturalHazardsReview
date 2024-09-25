@@ -1,0 +1,369 @@
+---
+title: "S1_FedCostsFrom_OB"
+author: "Laura Geronimo"
+date: "2024-09-13"
+output: html_document
+---
+
+The purpose of this worksheet is to estimate the NPV for costs to Toms River for Scenario 1. We discount the costs and group them into buckets for analysis.
+
+We discount at 2%, 3%, and 7% based on justifications provided in the SI.
+
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+#Importing data
+```{r include=FALSE}
+
+getwd()
+setwd('C:/Users/lgero/Box/Research/NJSG/Tradeoff_Analysis/V4')
+
+#libraries ####
+library(tidyverse)
+library(networkD3)
+library(dplyr)
+library(data.table)
+library(stringr)
+library(readxl)
+library(purrr)
+
+options(scipen=999)
+
+
+##Importing Data ####
+FedCostOB <- read.csv('./data/BaselineData/S1_OB_Inputs/Costs_ToFed_fromOB/FedCostOB.csv')
+FedCostOB <- FedCostOB[,c(-1)]
+
+```
+
+
+
+
+
+#Discounting values to 2%, summing to NPV, and grouping in buckets
+```{r include=FALSE}
+
+###discounting flows at 2% ####
+#Creating a year index 
+FedCostOB$YearIndex <- 0:10
+
+#Define the function for discounting flows by 2% 
+dis2pct <- function(df, amount_cols, year_index_col, discount_rate = 0.02, base_year = 0) {
+  for (col in amount_cols) {
+    discounted_col_name <- paste0(col, "_dis2pct")
+    df[[discounted_col_name]] <- df[[col]] / ((1 + discount_rate) ^ (df[[year_index_col]] - base_year))
+  }
+  return(df)
+}
+
+# List of columns to discount - select colums starting with OB 
+amount_cols <-  grep("^OB_", colnames(FedCostOB), value = TRUE)
+
+# Apply the discount function
+FedCostOB_dis2pct <- dis2pct(FedCostOB, amount_cols, year_index_col = "YearIndex")
+
+# Remove undiscounted columns
+FedCostOB_dis2pct <- FedCostOB_dis2pct %>%
+  select(Year, YearIndex, ends_with("_dis2pct"))
+
+###Summing to NPV ####
+#Create a new data frame that sums the discounted columns for NPV (2020USD)
+FedCostOB_dis2pct_NPV <- FedCostOB_dis2pct %>%
+  summarise(across(ends_with("_dis2pct"), sum, na.rm = TRUE))
+
+###creating buckets ####
+#Summing Fed Share for Response and Recovery Direct to Municipal Government / School District
+FedCostOB_dis2pct_NPV <- FedCostOB_dis2pct_NPV %>%
+  mutate(OB_FedShare_ToTR_ResponseRecovery_dis2pct= 
+           OB_FedShare_DCA_LGS_LMI_adj_dis2pct +
+           OB_FedShare_DCA_LGS_UN_adj_dis2pct +
+           OB_FedShare_DCA_LPS_adj_dis2pct +
+           OB_FedShare_DCA_ZCEG_UN_adj_dis2pct +
+           OB_FedShare_HMGP_adj_dis2pct +
+           OB_FedShare_PA_Debris_adj_dis2pct +
+           OB_FedShare_PA_Protect_adj_dis2pct +
+           OB_FedShare_PA_PublicBuildings_adj_dis2pct +
+           OB_FedShare_PA_PublicUtilities_adj_dis2pct +
+           OB_FedShare_PA_Recreational_adj_dis2pct +
+           OB_FedShare_CDL_Muni_adj_dis2pct +
+           OB_FedShare_CDL_School_adj_dis2pct +
+           OB_FedShare_CDL_Services_adj_dis2pct)
+
+#Summing Fed Share for Roads & Bridges
+FedCostOB_dis2pct_NPV <- FedCostOB_dis2pct_NPV %>%
+  mutate(OB_FedShare_ToRoadsBridge_dis2pct= 
+           OB_FedShare_DOT_Rt35_adj_dis2pct +
+           OB_FedShare_DOT_Rt37_adj_dis2pct +
+           OB_FedShare_PA_RoadsBridges_adj_dis2pct +
+           OB_FedShare_DOT_LocalAid_adj_dis2pct)
+
+
+#Summing Fed Share for Response and Recovery Direct to Individuals
+FedCostOB_dis2pct_NPV <- FedCostOB_dis2pct_NPV %>%
+  mutate(OB_FedShare_ToIndiv_ResponseRecovery_dis2pct= 
+           OB_FedShare_DCA_Housing_LandLordIncentive_LMI_dis2pct +
+           OB_FedShare_DCA_Housing_NEP_LMI_dis2pct +
+           OB_FedShare_DCA_LMI_HomeownerRebuilding_dis2pct +
+           OB_FedShare_DCA_Resettlement_LMI_dis2pct +
+           OB_FedShare_DCA_Resettlement_UN_dis2pct +
+           OB_FedShare_DCA_RREM_LMI_dis2pct +
+           OB_FedShare_DCA_RREM_UN_dis2pct+
+           OB_FedShare_IA_dis2pct)
+  
+#Summing Fed Share for NFIP Claims Direct to Individuals
+FedCostOB_dis2pct_NPV <- FedCostOB_dis2pct_NPV %>%
+  mutate(OB_FedShare_NFIP_dis2pct= 
+           OB_NFIP_BuildingsClaims_adj_dis2pct +
+           OB_NFIP_ContentsClaims_adj_dis2pct +
+           OB_NFIP_ICCClaims_adj_dis2pct)
+
+
+
+#selecting variables
+FedCostOB_dis2pct_NPV <- FedCostOB_dis2pct_NPV %>%
+  select(OB_FedShare_ToTR_ResponseRecovery_dis2pct,
+         OB_FedShare_ToRoadsBridge_dis2pct,
+         OB_FedShare_BeachNourish_adj_dis2pct,
+         OB_FedShare_ToIndiv_ResponseRecovery_dis2pct,
+         OB_FedShare_NFIP_dis2pct)
+
+#pivoting tables longer
+S1_FedCostOB_dis2pct_NPV <- FedCostOB_dis2pct_NPV %>%
+  pivot_longer(
+    cols = everything(),      # Pivot all columns
+    names_to = "variable",     # New column with variable names
+    values_to = "dis2pct"      # New column with the values
+  ) %>%
+  mutate(variable = sub("_dis2pct", "", variable)) 
+```
+
+
+
+#Discounting values to 3%, summing to NPV, and grouping in buckets
+```{r include=FALSE}
+
+###discounting flows at 3% ####
+#Creating a year index 
+FedCostOB$YearIndex <- 0:10
+
+#Define the function for discounting flows by 3% 
+dis3pct <- function(df, amount_cols, year_index_col, discount_rate = 0.03, base_year = 0) {
+  for (col in amount_cols) {
+    discounted_col_name <- paste0(col, "_dis3pct")
+    df[[discounted_col_name]] <- df[[col]] / ((1 + discount_rate) ^ (df[[year_index_col]] - base_year))
+  }
+  return(df)
+}
+
+# List of columns to discount - select colums starting with OB 
+amount_cols <-  grep("^OB_", colnames(FedCostOB), value = TRUE)
+
+# Apply the discount function
+FedCostOB_dis3pct <- dis3pct(FedCostOB, amount_cols, year_index_col = "YearIndex")
+
+# Remove undiscounted columns
+FedCostOB_dis3pct <- FedCostOB_dis3pct %>%
+  select(Year, YearIndex, ends_with("_dis3pct"))
+
+###Summing to NPV ####
+#Create a new data frame that sums the discounted columns for NPV (3030USD)
+FedCostOB_dis3pct_NPV <- FedCostOB_dis3pct %>%
+  summarise(across(ends_with("_dis3pct"), sum, na.rm = TRUE))
+
+###creating buckets ####
+#Summing Fed Share for Response and Recovery Direct to Municipal Government / School District
+FedCostOB_dis3pct_NPV <- FedCostOB_dis3pct_NPV %>%
+  mutate(OB_FedShare_ToTR_ResponseRecovery_dis3pct= 
+           OB_FedShare_DCA_LGS_LMI_adj_dis3pct +
+           OB_FedShare_DCA_LGS_UN_adj_dis3pct +
+           OB_FedShare_DCA_LPS_adj_dis3pct +
+           OB_FedShare_DCA_ZCEG_UN_adj_dis3pct +
+           OB_FedShare_HMGP_adj_dis3pct +
+           OB_FedShare_PA_Debris_adj_dis3pct +
+           OB_FedShare_PA_Protect_adj_dis3pct +
+           OB_FedShare_PA_PublicBuildings_adj_dis3pct +
+           OB_FedShare_PA_PublicUtilities_adj_dis3pct +
+           OB_FedShare_PA_Recreational_adj_dis3pct +
+           OB_FedShare_CDL_Muni_adj_dis3pct +
+           OB_FedShare_CDL_School_adj_dis3pct +
+           OB_FedShare_CDL_Services_adj_dis3pct)
+
+#Summing Fed Share for Roads & Bridges
+FedCostOB_dis3pct_NPV <- FedCostOB_dis3pct_NPV %>%
+  mutate(OB_FedShare_ToRoadsBridge_dis3pct= 
+           OB_FedShare_DOT_Rt35_adj_dis3pct +
+           OB_FedShare_DOT_Rt37_adj_dis3pct +
+           OB_FedShare_PA_RoadsBridges_adj_dis3pct +
+           OB_FedShare_DOT_LocalAid_adj_dis3pct)
+
+
+#Summing Fed Share for Response and Recovery Direct to Individuals
+FedCostOB_dis3pct_NPV <- FedCostOB_dis3pct_NPV %>%
+  mutate(OB_FedShare_ToIndiv_ResponseRecovery_dis3pct= 
+           OB_FedShare_DCA_Housing_LandLordIncentive_LMI_dis3pct +
+           OB_FedShare_DCA_Housing_NEP_LMI_dis3pct +
+           OB_FedShare_DCA_LMI_HomeownerRebuilding_dis3pct +
+           OB_FedShare_DCA_Resettlement_LMI_dis3pct +
+           OB_FedShare_DCA_Resettlement_UN_dis3pct +
+           OB_FedShare_DCA_RREM_LMI_dis3pct +
+           OB_FedShare_DCA_RREM_UN_dis3pct +
+          OB_FedShare_IA_dis3pct)
+  
+#Summing Fed Share for NFIP Claims Direct to Individuals
+FedCostOB_dis3pct_NPV <- FedCostOB_dis3pct_NPV %>%
+  mutate(OB_FedShare_NFIP_dis3pct= 
+           OB_NFIP_BuildingsClaims_adj_dis3pct +
+           OB_NFIP_ContentsClaims_adj_dis3pct +
+           OB_NFIP_ICCClaims_adj_dis3pct)
+
+
+
+#selecting variables
+FedCostOB_dis3pct_NPV <- FedCostOB_dis3pct_NPV %>%
+  select(OB_FedShare_ToTR_ResponseRecovery_dis3pct,
+         OB_FedShare_ToRoadsBridge_dis3pct,
+         OB_FedShare_BeachNourish_adj_dis3pct,
+         OB_FedShare_ToIndiv_ResponseRecovery_dis3pct,
+         OB_FedShare_NFIP_dis3pct)
+
+#pivoting tables longer
+S1_FedCostOB_dis3pct_NPV <- FedCostOB_dis3pct_NPV %>%
+  pivot_longer(
+    cols = everything(),      # Pivot all columns
+    names_to = "variable",     # New column with variable names
+    values_to = "dis3pct"      # New column with the values
+  ) %>%
+  mutate(variable = sub("_dis3pct", "", variable)) 
+```
+
+
+
+#Discounting values to 7%, summing to NPV, and grouping in buckets
+```{r include=FALSE}
+
+###discounting flows at 7% ####
+#Creating a year index 
+FedCostOB$YearIndex <- 0:10
+
+#Define the function for discounting flows by 7% 
+dis7pct <- function(df, amount_cols, year_index_col, discount_rate = 0.07, base_year = 0) {
+  for (col in amount_cols) {
+    discounted_col_name <- paste0(col, "_dis7pct")
+    df[[discounted_col_name]] <- df[[col]] / ((1 + discount_rate) ^ (df[[year_index_col]] - base_year))
+  }
+  return(df)
+}
+
+# List of columns to discount - select colums starting with OB 
+amount_cols <-  grep("^OB_", colnames(FedCostOB), value = TRUE)
+
+# Apply the discount function
+FedCostOB_dis7pct <- dis7pct(FedCostOB, amount_cols, year_index_col = "YearIndex")
+
+# Remove undiscounted columns
+FedCostOB_dis7pct <- FedCostOB_dis7pct %>%
+  select(Year, YearIndex, ends_with("_dis7pct"))
+
+###Summing to NPV ####
+#Create a new data frame that sums the discounted columns for NPV (7070USD)
+FedCostOB_dis7pct_NPV <- FedCostOB_dis7pct %>%
+  summarise(across(ends_with("_dis7pct"), sum, na.rm = TRUE))
+
+###creating buckets ####
+#Summing Fed Share for Response and Recovery Direct to Municipal Government / School District
+FedCostOB_dis7pct_NPV <- FedCostOB_dis7pct_NPV %>%
+  mutate(OB_FedShare_ToTR_ResponseRecovery_dis7pct= 
+           OB_FedShare_DCA_LGS_LMI_adj_dis7pct +
+           OB_FedShare_DCA_LGS_UN_adj_dis7pct +
+           OB_FedShare_DCA_LPS_adj_dis7pct +
+           OB_FedShare_DCA_ZCEG_UN_adj_dis7pct +
+           OB_FedShare_HMGP_adj_dis7pct +
+           OB_FedShare_PA_Debris_adj_dis7pct +
+           OB_FedShare_PA_Protect_adj_dis7pct +
+           OB_FedShare_PA_PublicBuildings_adj_dis7pct +
+           OB_FedShare_PA_PublicUtilities_adj_dis7pct +
+           OB_FedShare_PA_Recreational_adj_dis7pct +
+           OB_FedShare_CDL_Muni_adj_dis7pct +
+           OB_FedShare_CDL_School_adj_dis7pct +
+           OB_FedShare_CDL_Services_adj_dis7pct)
+
+#Summing Fed Share for Roads & Bridges
+FedCostOB_dis7pct_NPV <- FedCostOB_dis7pct_NPV %>%
+  mutate(OB_FedShare_ToRoadsBridge_dis7pct= 
+           OB_FedShare_DOT_Rt35_adj_dis7pct +
+           OB_FedShare_DOT_Rt37_adj_dis7pct +
+           OB_FedShare_PA_RoadsBridges_adj_dis7pct +
+           OB_FedShare_DOT_LocalAid_adj_dis7pct)
+
+
+#Summing Fed Share for Response and Recovery Direct to Individuals
+FedCostOB_dis7pct_NPV <- FedCostOB_dis7pct_NPV %>%
+  mutate(OB_FedShare_ToIndiv_ResponseRecovery_dis7pct= 
+           OB_FedShare_DCA_Housing_LandLordIncentive_LMI_dis7pct +
+           OB_FedShare_DCA_Housing_NEP_LMI_dis7pct +
+           OB_FedShare_DCA_LMI_HomeownerRebuilding_dis7pct +
+           OB_FedShare_DCA_Resettlement_LMI_dis7pct +
+           OB_FedShare_DCA_Resettlement_UN_dis7pct +
+           OB_FedShare_DCA_RREM_LMI_dis7pct +
+           OB_FedShare_DCA_RREM_UN_dis7pct +
+           OB_FedShare_IA_dis7pct)
+  
+#Summing Fed Share for NFIP Claims Direct to Individuals
+FedCostOB_dis7pct_NPV <- FedCostOB_dis7pct_NPV %>%
+  mutate(OB_FedShare_NFIP_dis7pct= 
+           OB_NFIP_BuildingsClaims_adj_dis7pct +
+           OB_NFIP_ContentsClaims_adj_dis7pct +
+           OB_NFIP_ICCClaims_adj_dis7pct)
+
+
+
+#selecting variables
+FedCostOB_dis7pct_NPV <- FedCostOB_dis7pct_NPV %>%
+  select(OB_FedShare_ToTR_ResponseRecovery_dis7pct,
+         OB_FedShare_ToRoadsBridge_dis7pct,
+         OB_FedShare_BeachNourish_adj_dis7pct,
+         OB_FedShare_ToIndiv_ResponseRecovery_dis7pct,
+         OB_FedShare_NFIP_dis7pct)
+
+#pivoting tables longer
+S1_FedCostOB_dis7pct_NPV <- FedCostOB_dis7pct_NPV %>%
+  pivot_longer(
+    cols = everything(),      # Pivot all columns
+    names_to = "variable",     # New column with variable names
+    values_to = "dis7pct"      # New column with the values
+  ) %>%
+  mutate(variable = sub("_dis7pct", "", variable)) 
+```
+
+
+#Joining data for export
+```{r include = FALSE}
+#pivoting tables longer
+S1_FedCostOB_NPV <- S1_FedCostOB_dis2pct_NPV %>%
+  left_join(S1_FedCostOB_dis3pct_NPV, by = "variable") %>%
+  left_join(S1_FedCostOB_dis7pct_NPV, by = "variable")
+
+```
+
+#Writing out discounted NPV files
+```{r include= FALSE}
+path <- './data/BaselineData/S1_OB_Inputs'
+
+write.csv(S1_FedCostOB_NPV, file.path(path, "S1_FedCostOB_NPV.csv"), row.names = TRUE)
+
+```
+
+#QC
+```{r include= FALSE}
+S1_FedCostOB_dis2pct_NPV <- sum(S1_FedCostOB_NPV$dis2pct)
+S1_FedCostOB_dis3pct_NPV <- sum(S1_FedCostOB_NPV$dis3pct)
+S1_FedCostOB_dis7pct_NPV <- sum(S1_FedCostOB_NPV$dis7pct)
+
+S1_FedCostOB_dis2pct_NPV
+S1_FedCostOB_dis3pct_NPV
+S1_FedCostOB_dis7pct_NPV
+```

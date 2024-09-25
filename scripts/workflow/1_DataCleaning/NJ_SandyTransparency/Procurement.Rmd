@@ -1,0 +1,28 @@
+---
+title: "NJST: Federal Level Procurements"
+author: "Laura Geronimo"
+date: '2024-08-23'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r include=FALSE}
+
+getwd()
+setwd('C:/Users/lgero/Box/Research/NJSG/Tradeoff_Analysis/V4')
+
+#libraries ####
+library(tidyverse)
+library(networkD3)
+library(dplyr)
+library(data.table)
+library(stringr)
+library(readxl)
+
+options(scipen=999)
+
+##Importing Data
+Procure <- read_excel('./data/DataDownloads/NJ_SandyTransparencyData/Federal_Agency_Datasets/Federal_Level_Procurements_Hurricane_Sandy_Report_original.xls', sheet=1)

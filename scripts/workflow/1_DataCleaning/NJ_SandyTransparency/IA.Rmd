@@ -1,0 +1,58 @@
+---
+title: "NJST: FEMA Individual Assistance Program Overview"
+author: "Laura Geronimo"
+date: '2024-08-23'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r include=FALSE}
+
+getwd()
+setwd('C:/Users/lgero/Box/Research/NJSG/Tradeoff_Analysis/V4')
+
+#libraries ####
+library(tidyverse)
+library(networkD3)
+library(dplyr)
+library(data.table)
+library(stringr)
+
+options(scipen=999)
+
+##Importing Data
+IA <- read.csv('./data/DataDownloads/NJ_SandyTransparencyData/Federal_Agency_Datasets/Sandy_IA_Master_Data.csv')
+
+
+```
+
+#Subsetting IA data to Toms River
+```{R include = FALSE}
+
+#subset
+IA_TR <- subset(IA, Municipality=="TOMS RIVER TOWNSHIP")
+
+#obtaining year
+IA_TR$Year <- str_sub(IA_TR$As.Of.Date, -4)
+
+
+#CPI adjusting to 2020 USD
+#obtaining CPI multiplier for 2016
+IA_TR$Disbursed.Amount_adj <- IA_TR$Disbursed.Amount * 1.09
+
+#reduce columns
+IA_TR <- IA_TR %>% select(
+  Year,
+  Disbursed.Amount_adj
+)
+
+```
+
+#writing out file
+```{R include=FALSE}
+path <- './data/BaselineData/NJ_SandyTransparencey_produced'
+write.csv(IA_TR, file.path(path, "IA_TR_FedShare_ByYear.csv"), row.names = TRUE)
+```
