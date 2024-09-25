@@ -1,30 +1,28 @@
 [![DOI](https://zenodo.org/badge/265254045.svg)](https://zenodo.org/doi/10.5281/zenodo.10442485)
 
-<!-- Get rid of the metarepo instructions (the two sections below this) once you're done. -->
 
-# metarepo
-## [Check out the website for instructions](https://immm-sfa.github.io/metarepo)
-`metarepo` is short for meta-repository, a GitHub repository that contains instructions to reproduce results in a published work. This repo is a template for creating your own metarepo.
+# Geronimo-etal_2024_RiskAnalysis
 
-## Purpose
-A meta-repository creates a single point of access for someone to find all of the components that were used to create a published work for the purpose of reproducibility. This repository should contain references to all minted data and software as well as any ancillary code used to transform the source data, create figures for your publication, conduct the experiment, and / or execute the contributing software.
+**Federal transfers backstop municipal funding gaps post-disaster, enabling rebuilding in repetitive loss regions: a New Jersey case study. (once published, include a link to the text)**
 
-<!-- Get rid of the metarepo instructions (the two sections above this) once you're done. -->
+Dr. Laura Geronimo<sup>1\*</sup>, Dr. Clint Andrews<sup>2</sup>, Dr. Robert E. Kopp<sup>3</sup>,  Dr. William B. Payne<sup>4</sup> and Dr. Elisabeth Gilmore<sup>5</sup>
 
-# lastname-etal_year_journal
+<sup>1 </sup>Postdoctoral Associate, Department of Earth and Planetary Sciences, Rutgers University, New Brunswick, NJ, USA
 
-**your Paper Title here (once published, include a link to the text)**
+<sup>2 </sup> Distinguished Professor, E.J. Bloustein School of Planning & Public Policy; Rutgers University,  New Brunswick, NJ, USA
 
-First Last<sup>1\*</sup>, First Last<sup>1</sup>,  and First Last<sup>1, 2</sup>
+<sup>3 </sup> Distinguished Professor, Department of Earth and Planetary Sciences; Rutgers University, New Brunswick, NJ, USA
 
-<sup>1 </sup>Pacific Northwest National Laboratory, Richland, WA, USA.
+<sup>4 </sup> Assistant Professor, E.J. Bloustein School of Planning & Public Policy; Rutgers University, New Brunswick, NJ, USA
 
-<sup>2 </sup> Institute for Energy Analysis, Oak Ridge Associated Universities, Washington, DC, USA
+<sup>5 </sup> Associate Professor, Department of Civil and Environmental Engineering, Carleton University, Ontario, Canada
 
-\* corresponding author:  email@myorg.gov
+\* corresponding author: laura.geronimo@rutgers.edu
 
 ## Abstract
-_your abstract here_
+ABSTRACT: 
+Coastal impacts from climate-induced sea level rise and storm surge are straining finances at federal, local, and household levels, elevating debates on resource distribution for adaptation. In the U.S., cost-sharing agreements create expectations for federal aid after flood disasters. However, the continued use of federal funds to backstop the cost of disasters may become unsustainable. We focus on the neighborhood of Ortley Beach in the municipality of Toms River, New Jersey, to evaluate the  efficiency and distribution of costs after Superstorm Sandy. Findings demonstrate how intergovernmental transfers soften local budget constraints and incentivize rebuilding. We propose alternative response scenarios and apply a conservative economic analysis to identify the most cost-effective policies over 50 years. Results vary with discount rates and assumptions about home values, protection costs, and residual risk. At a 2 percent discount rate, buyout costs breakeven with the costs of rebuilding and elevating homes if the market value of homes is deflated by approximately 35 percent, or if the residual risk and protection estimates are approximately doubled. Clustered buyouts of the most exposed homes would likely have been optimal post-Sandy. This case study presents methods for evaluating distributional and efficiency outcomes of adaptation pathways relevant to other regions.
+
 
 ## Journal reference
 _your journal reference_
@@ -41,9 +39,10 @@ _your software reference here_
 ## Data reference
 
 ### Input data
-Reference for each minted data source for your input data.  For example:
+Input data is obtained from various public or third party sources. All publicly available input data used in this analysis has been downloaded and can be
 
-Human, I.M. (2021). My input dataset name [Data set]. DataHub. https://doi.org/some-doi-number
+Geronimo, L. (2024). Input data for coastal risk analysis project [Data set]. Zenodo. https://doi.org/10.5281/zenodo.10.5281/zenodo.13835761
+
 
 _your input data references here_
 
