@@ -1,0 +1,113 @@
+---
+title: "NJST: FEMA HMGP Program Overview"
+author: "Laura Geronimo"
+date: '2024-08-23'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r include=FALSE}
+
+getwd()
+setwd('C:/Users/lgero/Box/Research/NJSG/Tradeoff_Analysis/V4')
+
+#libraries ####
+library(tidyverse)
+library(networkD3)
+library(dplyr)
+library(data.table)
+library(stringr)
+
+options(scipen=999)
+
+##Importing Data
+HMGP <- read.csv('./data/DataDownloads/NJ_SandyTransparencyData/State_Agency_Datasets/Sandy_HMGP_Master_Data.csv')
+
+## Explore####
+colSums(is.na(HMGP))
+table(HMGP$Project)
+
+```
+
+
+### Part 1: Data subset and processing: CPI Adjustments
+```{r, include=FALSE}
+#subset to Ocean County / Toms River 
+table(is.na(HMGP$County))
+table(is.na(HMGP$Municipality))
+HMGP_Ocean <- subset(HMGP, County=="OCEAN")
+
+#examine missing data
+colSums(is.na(HMGP_Ocean)) 
+
+#extracting year 
+HMGP_Ocean$Disbursed.Year <- sub(".*(.{4})$", "\\1", HMGP_Ocean$Federal.Disbursed.Date)
+table(HMGP_Ocean$Disbursed.Year) #
+class(HMGP_Ocean$Disbursed.Year)
+
+HMGP_Ocean$Disbursed.Year <- as.double(HMGP_Ocean$Disbursed.Year)
+
+
+#creating dataframe for CPI Adjustments
+##adjusting for Inflation####
+Disbursed.Year<- c(2011,2012,2013,2014,2015,2016,2017,2018,2019,2020,2021,2022,2023)
+CPI <-c(1.17,1.14,1.12,1.10,1.10,1.09,1.06,1.04,1.02,1.00,0.99,0.92,0.86)
+CPI <- data.frame(Disbursed.Year, CPI)
+class(CPI$Disbursed.Year)
+
+#join CPI multipliers to Ocean dataframe by year var
+HMGP_Ocean<-left_join(HMGP_Ocean, CPI, by="Disbursed.Year", copy=F)
+colSums(is.na(HMGP_Ocean))
+
+##multiply the $ amounts you are using in links by CPI and create new var, append 'adj' to var
+HMGP_Ocean$Federal.Disbursed.Amount.Adj <- HMGP_Ocean$Federal.Disbursed.Amount * HMGP_Ocean$CPI
+
+HMGP_Ocean$Local.Share.Adj <- HMGP_Ocean$Local.Share * HMGP_Ocean$CPI
+
+#Spot Check:
+QC1<-sum(HMGP_Ocean$Federal.Disbursed.Amount, na.rm=T)
+QC2<-sum(HMGP_Ocean$Federal.Disbursed.Amount.Adj, na.rm=T) #should be greater than QC1
+QC3<-QC2-QC1 #looks like it processed
+QC3
+
+QC1<-sum(HMGP_Ocean$Local.Share, na.rm=T)
+QC2<-sum(HMGP_Ocean$Local.Share.Adj, na.rm=T) #should be greater than QC1
+QC3<-QC2-QC1 #looks like it processed
+QC3
+
+
+#subset to Toms River
+HMGP_TR <- subset(HMGP_Ocean, Municipality=="TOMS RIVER TOWNSHIP")
+```
+
+#Creating a subset for Toms River by Year
+```{r include=FALSE}
+HMGP_TR <- subset(HMGP_Ocean, Municipality=="TOMS RIVER TOWNSHIP")
+HMGP_TR_FederalShare_ByYear <- HMGP_TR %>% 
+  select(`Project`, Disbursed.Year, `Federal.Disbursed.Amount.Adj`) %>% #Use Adjusted version
+  group_by(`Project`, Disbursed.Year) %>% 
+  summarise(value=sum(`Federal.Disbursed.Amount.Adj`,na.rm = T))%>% 
+  ungroup()
+
+names(HMGP_TR_FederalShare_ByYear) <- c('Project','Disbursed.Year','Federal.Disbursed.Amount.Adj')
+
+path <- './data/BaselineData/NJ_SandyTransparencey_produced'
+write.csv(HMGP_TR_FederalShare_ByYear, file.path(path, "HMGP_TR_FederalShare_ByYear.csv"), row.names = TRUE)
+```
+
+```{r include=FALSE}
+
+HMGP_TR_LocalShare_ByYear <- HMGP_TR %>% 
+  select(`Project`, Disbursed.Year, `Local.Share.Adj`) %>% #Use Adjusted version
+  group_by(`Project`, Disbursed.Year) %>% 
+  summarise(value=sum(`Local.Share.Adj`,na.rm = T))%>% 
+  ungroup()
+
+names(HMGP_TR_LocalShare_ByYear) <- c('Project','Disbursed.Year','Local.Disbursed.Amount.Adj')
+
+path <- './data/BaselineData/NJ_SandyTransparencey_produced'
+write.csv(HMGP_TR_LocalShare_ByYear, file.path(path, "HMGP_TR_LocalShare_ByYear.csv"), row.names = TRUE)
+```

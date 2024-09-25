@@ -1,0 +1,103 @@
+---
+title: "DOT_Local_Aid Dataset"
+author: "Laura Geronimo"
+date: "2024-08-23"
+output: html_document
+---
+
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, include=FALSE}
+getwd()
+setwd('C:/Users/lgero/Box/Research/NJSG/Tradeoff_Analysis/V4')
+#libraries
+library(tidyverse)
+library(networkD3)
+library(dplyr)
+library(data.table)
+library(stringr)
+options(scipen=999)
+##importing data
+DOT <- read_csv("./data/DataDownloads/NJ_SandyTransparencyData/State_Agency_Datasets/Sandy_DOT_Master_Data.csv")
+## Explore####
+colSums(is.na(DOT))
+
+
+```
+
+```{r}
+##part 1
+### Part 1: Data subset and processing: CPI Adjustments
+#subset to Ocean County / Toms River 
+table(is.na(DOT$County))
+table(is.na(DOT$Municipality))
+DOT_Ocean <- subset(DOT, County=="OCEAN")
+
+
+#examine missing data
+colSums(is.na(DOT_Ocean)) 
+
+#extracting year
+DOT_Ocean$Completion.Year <- sub(".*(.{4})$", "\\1",DOT_Ocean$`Completion Date`)
+table(DOT_Ocean$Completion.Year) #
+class(DOT_Ocean$`Completion Year`)
+DOT_Ocean$Completion.Year <- as.numeric(DOT_Ocean$Completion.Year) #needs to be compatible class for join
+
+
+#creating dataframe for CPI Adjustments
+##adjusting for Inflation####
+Completion.Year <- c(2012,2013,2016)
+CPI <-c(1.14,1.12,1.09)
+CPI  <- data.frame(Completion.Year, CPI)
+class(CPI$Completion.Year)
+#join CPI multipliers to Ocean dataframe by year var
+DOT_Ocean <-left_join(DOT_Ocean, CPI, by="Completion.Year", copy=F)
+colSums(is.na(DOT_Ocean))
+
+
+##multiply the $ amounts you are using in links by CPI and create new var, append 'adj' to var
+DOT_Ocean$Disbursed.Amount.Adj <- DOT_Ocean$`Disbursed Amount` * DOT_Ocean$CPI
+
+#Spot Check:
+QC1<-sum(DOT_Ocean$`Disbursed Amount`, na.rm=T)
+QC2<-sum(DOT_Ocean$Disbursed.Amount.Adj, na.rm=T) #should be greater than QC1
+QC3<-QC2-QC1 #looks like it processed
+
+
+```
+
+
+##Subsetting to projects impacting Toms River
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+#Q1.D: DOT Total Cost by Project related to Toms River Only
+summary (DOT_Ocean$Municipality)
+
+DOT_TR4 <- subset(DOT_Ocean, Municipality== "TOMS RIVER TOWNSHIP") 
+                   
+DOT_TR1 <- subset(DOT_Ocean, Municipality=="LAVALLETTE BOROUGH, TOMS RIVER TOWNSHIP, BRICK TOWNSHIP")
+DOT_TR2 <- subset(DOT_Ocean, Municipality=="BERKELEY TOWNSHIP, SEASIDE PARK BOROUGH, SEASIDE HEIGHTS BOROUGH, TOMS RIVER TOWNSHIP")
+DOT_TR3 <- subset(DOT_Ocean, Municipality=="BERKELEY TOWNSHIP, SEASIDE HEIGHTS BOROUGH, LAVALLETTE BOROUGH, TOMS RIVER TOWNSHIP, BRICK TOWNSHIP")
+
+DOT_TR <- rbind(DOT_TR1, DOT_TR2, DOT_TR3, DOT_TR4)
+
+path <- 'C:/Users/lgero/Box/Research/NJSG/Tradeoff_Analysis/V4/data/BaselineData/NJ_SandyTransparencey_produced'
+write.csv(DOT_TR, file.path(path, "DOT_TR_FederalShare_ByYear.csv"), row.names = TRUE)
+```
+
+##Subsetting to projects impacting Ortley Beach based on text analysis of projects and mile markers
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+DOT_OB <- subset(DOT_TR, `Project Site #` != "63")
+
+#Analysis of mile markers at https://njogis-newjersey.opendata.arcgis.com/datasets/NJDOT::new-jersey-standard-route-id-and-milepost-/explore
+
+#Ortley Beach depends on Route 35 and the Bridge for connectivity, so we retain Route 35 and 37 even though the mile markers may span beyond Ortley. 
+
+path <- 'C:/Users/lgero/Box/Research/NJSG/Tradeoff_Analysis/V4/data/BaselineData/NJ_SandyTransparencey_produced'
+write.csv(DOT_OB, file.path(path, "DOT_OB_FederalShare_ByYear.csv"), row.names = TRUE)
+
+
+```

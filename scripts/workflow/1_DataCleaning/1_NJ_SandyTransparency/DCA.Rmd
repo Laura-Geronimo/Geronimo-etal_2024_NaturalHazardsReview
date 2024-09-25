@@ -1,0 +1,96 @@
+---
+title: "NJST: HUD DCA Program Overview"
+author: "Laura Geronimo"
+date: '2024-08-23'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r include=FALSE}
+
+getwd()
+setwd('C:/Users/lgero/Box/Research/NJSG/Tradeoff_Analysis/V4')
+
+#libraries ####
+library(tidyverse)
+library(networkD3)
+library(dplyr)
+library(data.table)
+library(stringr)
+
+options(scipen=999)
+
+##Importing Data
+DCA <- read.csv('C:/Users/lgero/Box/Research/NJSG/Tradeoff_Analysis/V4/data/DataDownloads/NJ_SandyTransparencyData/State_Agency_Datasets/Sandy_DCA_Master_Data.csv')
+
+## Explore####
+colSums(is.na(DCA))
+table(DCA$Project)
+
+```
+
+
+### Part 1: Data subset and processing: CPI Adjustments
+```{r, include=FALSE}
+#subset to Ocean County / Toms River 
+table(is.na(DCA$County))
+table(is.na(DCA$Municipality))
+DCA_Ocean <- subset(DCA, County=="OCEAN")
+DCA_TR <- subset(DCA, Municipality=="TOMS RIVER TOWNSHIP")
+
+#examine missing data
+colSums(is.na(DCA_Ocean)) 
+colSums(is.na(DCA_TR))
+
+#extracting year
+DCA_Ocean$Disbursed.Year <- sub(".*(.{4})$", "\\1",DCA_Ocean$Disbursed.Date)
+table(DCA_Ocean$Disbursed.Year) 
+class(DCA_Ocean$Disbursed.Year)
+
+DCA_Ocean$Disbursed.Year <- as.double(DCA_Ocean$Disbursed.Year)
+
+
+#creating dataframe for CPI Adjustments
+##adjusting for Inflation####
+Disbursed.Year<- c(2011,2012,2013,2014,2015,2016,2017,2018,2019,2020,2021,2022,2023)
+CPI <-c(1.17,1.14,1.12,1.10,1.10,1.09,1.06,1.04,1.02,1.00,0.99,0.92,0.86)
+CPI  <- data.frame(Disbursed.Year, CPI)
+class(CPI$Disbursed.Year)
+
+#join CPI multipliers to Ocean dataframe by year var
+DCA_Ocean<-left_join(DCA_Ocean, CPI, by="Disbursed.Year", copy=F)
+colSums(is.na(DCA_Ocean))
+
+##multiply the $ amounts you are using in links by CPI and create new var, append 'adj' to var
+DCA_Ocean$Disbursed.Amount.Adj <- DCA_Ocean$Disbursed.Amount * DCA_Ocean$CPI
+#DCA_Ocean$Local.Share.Adj <- DCA_Ocean$Local.Share * DCA_Ocean$CPI (NA for PA)
+
+
+#Spot Check:
+QC1<-sum(DCA_Ocean$Disbursed.Amount, na.rm=T)
+QC2<-sum(DCA_Ocean$Disbursed.Amount.Adj, na.rm=T) #should be greater than QC1
+QC3<-QC2-QC1 #looks like it processed
+QC3
+
+
+
+```
+
+
+#Creating a subset for Toms River by Year
+```{r include=FALSE}
+DCA_TR <- subset(DCA_Ocean, Municipality=="TOMS RIVER TOWNSHIP")
+DCA_TR_FederalShare_ByYear <- DCA_TR %>% 
+  select(`Project`, Disbursed.Year, `Disbursed.Amount.Adj`) %>% #Use Adjusted version
+  group_by(`Project`, Disbursed.Year) %>% 
+  summarise(value=sum(`Disbursed.Amount.Adj`,na.rm = T))%>% 
+  ungroup()
+
+names(DCA_TR_FederalShare_ByYear) <- c('Project','Disbursed.Year','Federal.Disbursed.Amount.Adj')
+
+path <- 'C:/Users/lgero/Box/Research/NJSG/Tradeoff_Analysis/V4/data/BaselineData/NJ_SandyTransparencey_produced'
+write.csv(DCA_TR_FederalShare_ByYear, file.path(path, "DCA_TR_FederalShare_ByYear.csv"), row.names = TRUE)
+```

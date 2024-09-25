@@ -1,0 +1,93 @@
+---
+title: "NJST: FEMA CDL Program Overview"
+author: "Laura Geronimo"
+date: '2024-08-23'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r include=FALSE}
+
+getwd()
+setwd('C:/Users/lgero/Box/Research/NJSG/Tradeoff_Analysis/V4')
+
+#libraries ####
+library(tidyverse)
+library(networkD3)
+library(dplyr)
+library(data.table)
+library(stringr)
+
+options(scipen=999)
+
+##Importing Data
+CDL <- read.csv('./data/DataDownloads/NJ_SandyTransparencyData/Federal_Agency_Datasets/Sandy_CDL_Master_Data.csv')
+
+## Explore####
+colSums(is.na(CDL))
+table(CDL$Project)
+
+```
+
+### Part 1: Data subset and processing: CPI Adjustments
+```{r, include=FALSE}
+#subset to Ocean County or Toms River 
+table(is.na(CDL$County))
+table(is.na(CDL$Municipality))
+CDL_Ocean <- subset(CDL, County=="OCEAN")
+CDL_TR <- subset(CDL, Municipality=="TOMS RIVER TOWNSHIP")
+
+#examine missing data
+colSums(is.na(CDL_Ocean)) 
+colSums(is.na(CDL_TR))
+
+#extracting year
+CDL_Ocean$As.Of.Date <- sub(".*(.{4})$", "\\1", CDL_Ocean$As.Of.Date) #note: disbursed data not available
+table(CDL_Ocean$As.Of.Date) 
+class(CDL_Ocean$As.Of.Date)
+CDL_Ocean$As.Of.Date <- as.numeric(CDL_Ocean$As.Of.Date) #needs to be compatible class for join
+
+#creating dataframe for CPI Adjustments
+##adjusting for Inflation####
+As.Of.Date<- c(2011,2012,2013,2014,2015,2016,2017,2018,2019,2020,2021,2022,2023)
+CPI <-c(1.17,1.14,1.12,1.10,1.10,1.09,1.06,1.04,1.02,1.00,0.99,0.92,0.86)
+CPI  <- data.frame(As.Of.Date, CPI)
+class(CPI$As.Of.Date)
+
+#join CPI multipliers to Ocean dataframe by year var
+CDL_Ocean<-left_join(CDL_Ocean, CPI, by="As.Of.Date", copy=F)
+colSums(is.na(CDL_Ocean))
+
+##multiply the $ amounts you are using in links by CPI and create new var, append 'adj' to var
+CDL_Ocean$Federal.Disbursed.Amount.Adj <- CDL_Ocean$Disbursed.Amount * CDL_Ocean$CPI
+
+#Spot Check:
+QC1<-sum(CDL_Ocean$Disbursed.Amount, na.rm=T)
+QC2<-sum(CDL_Ocean$Federal.Disbursed.Amount.Adj, na.rm=T) #should be greater than QC1
+QC3<-QC2-QC1 #looks like it processed
+
+
+```
+
+
+#Creating a subset for Toms River by Year 
+##Federal Cost Share by year
+```{r, include=FALSE}
+CDL_TR <- subset(CDL_Ocean, Municipality=="TOMS RIVER TOWNSHIP")
+CDL_TR_FederalShare_ByYear <- CDL_TR %>% 
+  select(`Project`, As.Of.Date, `Federal.Disbursed.Amount.Adj`) %>% #Use Adjusted version
+  group_by(`Project`, As.Of.Date) %>% 
+  summarise(value=sum(`Federal.Disbursed.Amount.Adj`,na.rm = T))%>% 
+  ungroup()
+
+names(CDL_TR_FederalShare_ByYear) <- c('Project','As.Of.Date','Federal.Disbursed.Amount.Adj')
+CDL_TR_FederalShare_ByYear <- na.omit(CDL_TR_FederalShare_ByYear)
+
+path <- 'C:/Users/lgero/Box/Research/NJSG/Tradeoff_Analysis/V4/data/BaselineData/NJ_SandyTransparencey_produced'
+write.csv(CDL_TR_FederalShare_ByYear, file.path(path, "CDL_TR_FederalShare_ByYear.csv"), row.names = TRUE)
+```
+
+##Local Cost Share - NA

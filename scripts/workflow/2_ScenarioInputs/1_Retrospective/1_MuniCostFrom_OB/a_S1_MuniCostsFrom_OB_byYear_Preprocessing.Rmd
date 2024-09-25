@@ -1,0 +1,383 @@
+---
+title: "Municipal Revenues from Ortley Beach - Preprocessing"
+author: "Laura Geronimo"
+date: "2024-08-23"
+output: html_document
+---
+The purpose of this worksheet is to estimate the costs to Toms River municipality of maintaining properties on Ortley Beach for Scenario 1 (replicating the historical record). Costs are estimated for the 2012-2022 period. Specifically we estimate:
+1) Municipal public works expenditures for Ortley Beach
+2) Municipal public safety expenditures for Ortley Beach
+3) School district costs for Ortley Beach
+4) Municipal cost share for Federal Response and Recovery for Ortley Beach
+5) Municipal cost share for beach replenishment for Ortley Beach
+
+
+Note that no municipal cost share was identified for the following:
+- DCA / HUD (CDBG-DR) grants
+- DOT grants
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+#Importing data
+```{r include=FALSE}
+
+getwd()
+setwd('C:/Users/lgero/Box/Research/NJSG/Tradeoff_Analysis/V4')
+
+#libraries ####
+library(tidyverse)
+library(networkD3)
+library(dplyr)
+library(data.table)
+library(stringr)
+library(readxl)
+library(purrr)
+
+options(scipen=999)
+
+##Importing Data ####
+Adjust <- read.csv('./data/BaselineData/InflationAdjusters.csv')
+TR_MuniExpend <- read.csv('./data/BaselineData/TomsRiver_Budget_ExpendituresSelection.csv')
+TR_SchoolExpend <- read.csv('./data/BaselineData/TomsRiver_SchoolDistrictInfo.csv')
+
+#Data for downscaling
+OB_DemoData <- read_xlsx('./data/BaselineData/OrtleyBeach_DemographicData.xlsx', sheet=1)
+TR_DemoData <- read_xlsx('./data/BaselineData/TomsRiver_DemographicData.xlsx', sheet=1)
+
+TR_Sandy <- read_xlsx('./data/BaselineData/TomsRiver_SandyImpacts.xlsx', sheet=1)
+
+#Municipal cost share for recovery to TR (needs further downscaling to OB)
+TR_LocalShare_PA <- read.csv('./data/BaselineData/NJ_SandyTransparencey_produced/PA_TR_LocalShare_ByYear.csv')
+TR_LocalShare_HMGP <- read.csv('./data/BaselineData/NJ_SandyTransparencey_produced/HMGP_TR_LocalShare_ByYear.csv')
+
+
+#Municipal cost share for recovery to OB (already downscaled to Ortley Beach (OB))
+OB_BeachNourish <- read.csv('./data/BaselineData/OrtleyBeach_BeachNourishment.csv')
+
+
+```
+
+#1: Estimating Municipal Public Works expenditures for Ortley Beach 
+```{r include=FALSE}
+#selecting multipliers
+Adjust <- Adjust %>% select(
+  "Year",
+  "CPI_Multiplier_USD2020",
+  "SLIPD_V3_Multiplier"
+)
+
+#reducing to year 2012+
+TR_MuniExpend <- subset(TR_MuniExpend, Year > 2011)
+
+
+#joining inflation adjusters by year
+TR_MuniExpend <- left_join(TR_MuniExpend, Adjust, by="Year")
+
+#adjusting public works line using SLIPD
+TR_MuniExpend$Public_Works_adj <- TR_MuniExpend$Public_Works * TR_MuniExpend$SLIPD_V3_Multiplier
+
+###Downscaling Public Works (downscaled by total local road miles) ####
+TR_LocalRoads_TotalMiles <-  TR_Sandy$Estimate[TR_Sandy$Variable == "TR_LocalRoads_TotalMiles"]
+OB_LocalRoads_TotalMiles <-  TR_Sandy$Estimate[TR_Sandy$Variable == "OB_LocalRoads_TotalMiles"]
+
+###Estimate Public Works funds disbursed per capita #### 
+TR_MuniExpend$Public_Works_Per_Mile <- TR_MuniExpend$Public_Works_adj / TR_LocalRoads_TotalMiles
+
+###Estimate Public Works funds disbursed to Ortley Beach #### 
+TR_MuniExpend$OB_Public_Works_adj <- TR_MuniExpend$Public_Works_Per_Mile * OB_LocalRoads_TotalMiles 
+
+###Separate downscaled OB estimates for LMI projects as standalone table####
+OB_Public_Works_adj <- TR_MuniExpend %>% select(
+  "Year",
+  "OB_Public_Works_adj")
+
+```
+
+
+#2: Estimating Municipal Public Safety expenditures for Ortley Beach 
+```{r include=FALSE}
+
+
+#adjusting Public Safety line using SLIPD
+TR_MuniExpend$Public_Safety_adj <- TR_MuniExpend$Public_Safety * TR_MuniExpend$SLIPD_V3_Multiplier
+
+##Downscaling Public Safety (downscaled by total population) ####
+TR_tot_pop_estimate <-  TR_DemoData$TR_TotPopE[TR_DemoData$Year== "2012"]
+OB_tot_pop_estimate <-  OB_DemoData$OB_TotPop[OB_DemoData$Year== "2012"]
+
+###Estimate Public Safety funds disbursed per capita #### 
+TR_MuniExpend$Public_Safety_Per_Capita <- TR_MuniExpend$Public_Safety_adj / TR_tot_pop_estimate
+
+###Estimate Public Safety funds disbursed to Ortley Beach #### 
+TR_MuniExpend$OB_Public_Safety_adj <- TR_MuniExpend$Public_Safety_Per_Capita * OB_tot_pop_estimate 
+
+###Separate downscaled OB estimates for LMI projects as standalone table####
+OB_Public_Safety_adj <- TR_MuniExpend %>% select(
+  "Year",
+  "OB_Public_Safety_adj")
+
+```
+
+
+
+#3: Estimating School district costs for Ortley Beach
+```{r include=FALSE}
+#selecting multipliers
+Adjust <- Adjust %>% select(
+  "Year",
+  "CPI_Multiplier_USD2020",
+  "SLIPD_V3_Multiplier"
+)
+
+#reducing to year 2012+
+TR_SchoolExpend <- subset(TR_SchoolExpend, Year > 2011)
+
+
+#joining inflation adjusters by year
+TR_SchoolExpend <- left_join(TR_SchoolExpend, Adjust, by="Year")
+
+
+###Downscaling School Expenditure line (using adjusted cost per pupil * total school age children in Ortley Beach) ####
+OB_TotSchoolAgeChildren_5_17_E <-  OB_DemoData %>% select(Year, OB_TotSchoolAgeChildren_5_17_E)
+
+TR_SchoolExpend <- left_join(TR_SchoolExpend, OB_TotSchoolAgeChildren_5_17_E, by="Year")
+
+
+###Estimate School Expend disbursed to Ortley Beach #### 
+TR_SchoolExpend$OB_SchoolExpend_adj <- TR_SchoolExpend$TR_CostPerPupilBestEst_SLIPDAdj * TR_SchoolExpend$OB_TotSchoolAgeChildren_5_17_E
+
+###Separate downscaled OB estimates for LMI projects as standalone table####
+OB_SchoolExpend_adj <- TR_SchoolExpend %>% select(
+  "Year",
+  "OB_SchoolExpend_adj")
+
+```
+
+
+#4) Municipal cost share for Federal Response and Recovery for Ortley Beach
+
+
+##4a) Downscaling HMGP data for to Ortley Beach by project
+```{r include=FALSE}
+#note: Based on project information, HMGP funds went to public buildings outside of Ortley Beach
+head(TR_LocalShare_HMGP)
+
+###Downscaling Generators by public buildings####
+TR_PublicBuildings <- TR_Sandy$Estimate[TR_Sandy$Variable=="TR_PublicBuildings_SandyImpact"]
+OB_PublicBuildings <- TR_Sandy$Estimate[TR_Sandy$Variable=="OB_PublicBuildings_SandyImpact"]
+
+###Estimate HMGP disbursed per Sandy impacted public buildings #### 
+TR_LocalShare_HMGP$HMGP_Disbursed_Per_PublicBuildings <- TR_LocalShare_HMGP$Local.Disbursed.Amount.Adj / 
+TR_PublicBuildings 
+
+###Estimate HMGP disbursed funds disbursed to Ortley Beach #### 
+TR_LocalShare_HMGP$Local.Disbursed.Amount.Adj.OB <- TR_LocalShare_HMGP$HMGP_Disbursed_Per_PublicBuildings * OB_PublicBuildings
+
+###Cutting line for Ocean County Health Dept Generator since located outside of OB ####
+TR_LocalShare_HMGP <- subset(TR_LocalShare_HMGP, Project !="Ocean County Health Department Generator")
+
+###Separate downscaled OB estimates for HMGP projects as standalone table####
+OB_LocalShare_HMGP<- TR_LocalShare_HMGP %>% select(
+  "Disbursed.Year",
+  "Local.Disbursed.Amount.Adj.OB")
+
+###Renaming columns####
+colnames(OB_LocalShare_HMGP) <- c("Year", "OB_LocalShare_HMGP_adj")
+
+```
+
+##4c) Downscaling PA data for to Ortley Beach by project
+
+```{r include=FALSE}
+
+
+##PA Debris Removal by housing units impacted by Sandy####
+###Subset PA to Debris Removal####
+TR_LocalShare_PA_Debris <- subset(TR_LocalShare_PA, Project=="A - Debris Removal")
+
+###Downscaling PA Debris Removal (downscaled by housing units impacted by Sandy) ####
+TR_HU_SandyImpact <- TR_Sandy$Estimate[TR_Sandy$Variable=="TR_HU_SandyImpact"]
+OB_HU_SandyImpact <- TR_Sandy$Estimate[TR_Sandy$Variable=="OB_HU_SandyImpact"]
+
+###Estimate PA Debris Removal disbursed per housing unit #### 
+TR_LocalShare_PA_Debris$PA_Debris_Disbursed_Per_Capita <- TR_LocalShare_PA_Debris$Local.Share.Adj / TR_HU_SandyImpact 
+
+###Estimate PA Debris Removal funds disbursed to Ortley Beach #### 
+TR_LocalShare_PA_Debris$Local.Share.Adj.OB <- TR_LocalShare_PA_Debris$PA_Debris_Disbursed_Per_Capita * OB_HU_SandyImpact  
+
+###Separate downscaled OB estimates for Debris Removal projects as standalone table####
+OB_LocalShare_PA_Debris <- TR_LocalShare_PA_Debris %>% select(
+  "Disbursed.Year",
+  "Local.Share.Adj.OB")
+
+###Renaming columns####
+colnames(OB_LocalShare_PA_Debris) <- c("Year", "OB_LocalShare_PA_Debris_adj")
+
+
+##PA Protective Measures by housing units impacted by Sandy####
+###Subset PA to Protective Measures####
+TR_LocalShare_PA_Protect <- subset(TR_LocalShare_PA, Project=="B - Protective Measures")
+
+###Downscaling PA Protective Measures (downscaled by housing units impacted by Sandy) ####
+TR_HU_SandyImpact <- TR_Sandy$Estimate[TR_Sandy$Variable=="TR_HU_SandyImpact"]
+OB_HU_SandyImpact <- TR_Sandy$Estimate[TR_Sandy$Variable=="OB_HU_SandyImpact"]
+
+###Estimate PA Protective Measures disbursed per housing unit #### 
+TR_LocalShare_PA_Protect$PA_Protect_LocalShare_Per_HU <- TR_LocalShare_PA_Protect$Local.Share.Adj / TR_HU_SandyImpact 
+
+###Estimate PA Protective Measures funds disbursed to Ortley Beach #### 
+TR_LocalShare_PA_Protect$Local.Share.Adj.OB <- TR_LocalShare_PA_Protect$PA_Protect_LocalShare_Per_HU * OB_HU_SandyImpact  
+
+###Separate downscaled OB estimates for PA Protective Measures as standalone table####
+OB_LocalShare_PA_Protect <- TR_LocalShare_PA_Protect %>% select(
+  "Disbursed.Year",
+  "Local.Share.Adj.OB")
+
+###Renaming columns####
+colnames(OB_LocalShare_PA_Protect) <- c("Year", "OB_LocalShare_PA_Protect_adj")
+
+
+##PA  Roads & Bridges downscaled by miles of local roadway impacted by Sandy####
+###Subset PA to Roads and Bridges####
+TR_LocalShare_PA_RoadsBridges <- subset(TR_LocalShare_PA, Project=="C - Roads & Bridges")
+
+###Downscaling PA Roads and Bridges (downscaled by miles of local roadway impacted by Sandy) ####
+TR_Roads_SandyImpact <- TR_Sandy$Estimate[TR_Sandy$Variable=="TR_LocalRoads_TotalMiles_SandyImpact"]
+OB_Roads_SandyImpact <- TR_Sandy$Estimate[TR_Sandy$Variable=="OB_LocalRoads_SandyImpact"]
+
+###Estimate PA Roads and Bridges disbursed per road miles impacted#### 
+TR_LocalShare_PA_RoadsBridges$PA_Roads_LocalShare_Per_RoadMiles <- TR_LocalShare_PA_RoadsBridges$Local.Share.Adj / TR_Roads_SandyImpact 
+
+###Estimate PA Roads and Bridges funds disbursed to Ortley Beach #### 
+TR_LocalShare_PA_RoadsBridges$LocalShare.Adj.OB <- TR_LocalShare_PA_RoadsBridges$PA_Roads_LocalShare_Per_RoadMiles * OB_Roads_SandyImpact  
+
+###Separate downscaled OB estimates for PA Roads and Bridges as standalone table####
+OB_LocalShare_PA_RoadsBridges <- TR_LocalShare_PA_RoadsBridges  %>% select(
+  "Disbursed.Year",
+  "LocalShare.Adj.OB")
+
+###Renaming columns####
+colnames(OB_LocalShare_PA_RoadsBridges) <- c("Year", "OB_LocalShare_PA_RoadsBridges_adj")
+
+##PA  Public Buildings downscaled by public buildings impacted by Sandy####
+###Subset PA to Public Buildings####
+TR_LocalShare_PA_PublicBuildings<- subset(TR_LocalShare_PA, Project=="E - Public Buildings")
+
+###Downscaling PA Public Buildings (downscaled by public buildings impacted by Sandy ####
+TR_PublicBuildings <- TR_Sandy$Estimate[TR_Sandy$Variable=="TR_PublicBuildings_SandyImpact"]
+OB_PublicBuildings <- TR_Sandy$Estimate[TR_Sandy$Variable=="OB_PublicBuildings_SandyImpact"]
+
+###Estimate PA Public Buildings disbursed per road miles impacted#### 
+TR_LocalShare_PA_PublicBuildings$PA_PublicBuildings_Disbursed_Per_PublicBuildings <- TR_LocalShare_PA_PublicBuildings$Local.Share.Adj / TR_PublicBuildings
+
+###Estimate PA Public Buildings funds disbursed to Ortley Beach #### 
+TR_LocalShare_PA_PublicBuildings$Local.Share.Adj.OB <- TR_LocalShare_PA_PublicBuildings$PA_PublicBuildings_Disbursed_Per_PublicBuildings * OB_PublicBuildings 
+
+###Separate downscaled OB estimates for Public Buildings projects as standalone table####
+OB_LocalShare_PA_PublicBuildings<- TR_LocalShare_PA_PublicBuildings %>% select(
+  "Disbursed.Year",
+  "Local.Share.Adj.OB")
+
+###Renaming columns####
+colnames(OB_LocalShare_PA_PublicBuildings) <- c("Year", "OB_LocalShare_PA_PublicBuildings_adj")
+
+
+##PA  Public Utilities downscaled by housing units impacted by Sandy####
+###Subset PA to Public Utilities####
+TR_LocalShare_PA_PublicUtilities<- subset(TR_LocalShare_PA, Project=="F - Public Utilities")
+
+###Downscaling PA Public Utilities (downscaled by housing units impacted by Sandy) ####
+TR_HU_SandyImpact <- TR_Sandy$Estimate[TR_Sandy$Variable=="TR_HU_SandyImpact"]
+OB_HU_SandyImpact <- TR_Sandy$Estimate[TR_Sandy$Variable=="OB_HU_SandyImpact"]
+
+###Estimate PA Roads and Bridges disbursed per road miles impacted#### 
+TR_LocalShare_PA_PublicUtilities$PA_PublicUtilities_Disbursed_Per_PublicUtilities <- TR_LocalShare_PA_PublicUtilities$Local.Share.Adj / TR_HU_SandyImpact 
+
+###Estimate PA Roads and Bridges funds disbursed to Ortley Beach #### 
+TR_LocalShare_PA_PublicUtilities$Local.Share.Adj.OB <- TR_LocalShare_PA_PublicUtilities$PA_PublicUtilities_Disbursed_Per_PublicUtilities * OB_HU_SandyImpact 
+
+###Separate downscaled OB estimates for Public Utilities projects as standalone table####
+OB_LocalShare_PA_PublicUtilities<- TR_LocalShare_PA_PublicUtilities %>% select(
+  "Disbursed.Year",
+  "Local.Share.Adj.OB")
+
+###Renaming columns####
+colnames(OB_LocalShare_PA_PublicUtilities) <- c("Year", "OB_LocalShare_PA_PublicUtilities_adj")
+
+
+
+##PA  Recreational or Other downscaled by housing units impacted by Sandy####
+###Subset PA to Recreational or Other####
+TR_LocalShare_PA_Recreational<- subset(TR_LocalShare_PA, Project=="G - Recreational or Other")
+
+###Downscaling PA Recreational or Other (downscaled by housing units impacted by Sandy) ####
+TR_HU_SandyImpact <- TR_Sandy$Estimate[TR_Sandy$Variable=="TR_HU_SandyImpact"]
+OB_HU_SandyImpact <- TR_Sandy$Estimate[TR_Sandy$Variable=="OB_HU_SandyImpact"]
+
+###Estimate PA Roads and Bridges disbursed per road miles impacted#### 
+TR_LocalShare_PA_Recreational$PA_Recreational_Disbursed_Per_HU <- TR_LocalShare_PA_Recreational$Local.Share.Adj / TR_HU_SandyImpact 
+
+###Estimate PA Roads and Bridges funds disbursed to Ortley Beach #### 
+TR_LocalShare_PA_Recreational$Local.Share.Adj.OB <- TR_LocalShare_PA_Recreational$PA_Recreational_Disbursed_Per_HU * OB_HU_SandyImpact 
+
+###Separate downscaled OB estimates for Recreational or Other projects as standalone table####
+OB_LocalShare_PA_Recreational<- TR_LocalShare_PA_Recreational %>% select(
+  "Disbursed.Year",
+  "Local.Share.Adj.OB")
+
+OB_LocalShare_PA_Recreational <- subset(OB_LocalShare_PA_Recreational, Disbursed.Year < 2023)
+
+###Renaming columns####
+colnames(OB_LocalShare_PA_Recreational) <- c("Year", "OB_LocalShare_PA_Recreational_adj")
+
+```
+
+
+#5) Estimating Local cost share for Beach and dune nourishment.
+```{r include=FALSE}
+#Note: this has already downscaled to Ortley beach via literature review. Reducing to local contribution
+
+OB_LocalShare_BeachNourish <- OB_BeachNourish %>% select(
+  "Year",
+  "LocalCost_Adj"
+)
+
+###Renaming columns####
+colnames(OB_LocalShare_BeachNourish) <- c("Year", "OB_LocalShare_BeachNourish_adj")
+
+```
+
+
+#Knitting tables together to obtain Toms River Municipal Revenues from Ortley Beach by Year
+```{r include=FALSE}
+library(purrr)
+list_of_dfs <- list(OB_Public_Safety_adj,
+                    OB_Public_Works_adj,
+                    OB_SchoolExpend_adj,
+                    OB_LocalShare_HMGP,
+                    OB_LocalShare_PA_Debris,
+                    OB_LocalShare_PA_Protect,
+                    OB_LocalShare_PA_RoadsBridges,
+                    OB_LocalShare_PA_PublicBuildings,
+                    OB_LocalShare_PA_PublicUtilities,
+                    OB_LocalShare_PA_Recreational,
+                    OB_LocalShare_BeachNourish)
+
+MuniCostOB <- reduce(list_of_dfs, function(x, y) left_join(x, y, by = "Year"))
+
+#dropping 2011
+MuniCostOB <- MuniCostOB %>% 
+  filter(Year !=2011)
+
+```
+
+#Exporting S1 OB input tables:
+```{r include=FALSE}
+path <- 'C:/Users/lgero/Box/Research/NJSG/Tradeoff_Analysis/V4/data/BaselineData/S1_OB_Inputs/Costs_ToTR_fromOB'
+
+write.csv(MuniCostOB, file.path(path, "MuniCostOB.csv"), row.names = TRUE)
+
+
+```

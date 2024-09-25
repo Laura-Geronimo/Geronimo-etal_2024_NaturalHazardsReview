@@ -5,7 +5,7 @@ date: "2024-09-16"
 output: html_document
 ---
 
-In this worksheet we analyse and compare the total costs to society for scenario 1 (Rebuild), using best estimates.
+In this worksheet we analyse and compare the total costs to society for scenario 1 (Rebuild), using best estimates. We select retrospective policy cost and prospective protection and residual risk costs based on the scenario assumptions and discount rates. 
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
