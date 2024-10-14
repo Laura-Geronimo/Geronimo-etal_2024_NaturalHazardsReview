@@ -1,7 +1,7 @@
 [![DOI](https://zenodo.org/badge/265254045.svg)](https://zenodo.org/doi/10.5281/zenodo.10442485)
 
 
-# Geronimo-etal_2024_RiskAnalysis
+# Geronimo-etal_2024_NaturalHazardsReview
 
 **Tradeoff Analysis of Recovery Pathways post Superstorm Sandy: a New Jersey Case Study. (once published, include a link to the text)**
 
