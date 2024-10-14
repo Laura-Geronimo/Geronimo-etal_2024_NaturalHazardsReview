@@ -3,7 +3,7 @@
 
 # Geronimo-etal_2024_RiskAnalysis
 
-**Tradeoff Analysis of Recovery Pathways post Hurricane Sandy: a New Jersey Case Study. (once published, include a link to the text)**
+**Tradeoff Analysis of Recovery Pathways post Superstorm Sandy: a New Jersey Case Study. (once published, include a link to the text)**
 
 Dr. Laura Geronimo<sup>1\*</sup>, Dr. Clint Andrews<sup>2</sup>, Dr. Robert E. Kopp<sup>3</sup>,  Dr. William B. Payne<sup>4</sup> and Dr. Elisabeth Gilmore<sup>5</sup>
 
