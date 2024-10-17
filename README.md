@@ -1,23 +1,10 @@
 [![DOI](https://zenodo.org/badge/265254045.svg)](https://zenodo.org/doi/10.5281/zenodo.10442485)
 
 
-# Geronimo-etal_2024_NaturalHazardsReview
+# XXX-etal_2024_NaturalHazardsReview
 
 **Tradeoff Analysis of Recovery Pathways post Superstorm Sandy: a New Jersey Case Study. (once published, include a link to the text)**
 
-Dr. Laura Geronimo<sup>1\*</sup>, Dr. Clint Andrews<sup>2</sup>, Dr. Robert E. Kopp<sup>3</sup>,  Dr. William B. Payne<sup>4</sup> and Dr. Elisabeth Gilmore<sup>5</sup>
-
-<sup>1 </sup>Postdoctoral Associate, Department of Earth and Planetary Sciences, Rutgers University, New Brunswick, NJ, USA
-
-<sup>2 </sup> Distinguished Professor, E.J. Bloustein School of Planning & Public Policy; Rutgers University,  New Brunswick, NJ, USA
-
-<sup>3 </sup> Distinguished Professor, Department of Earth and Planetary Sciences; Rutgers University, New Brunswick, NJ, USA
-
-<sup>4 </sup> Assistant Professor, E.J. Bloustein School of Planning & Public Policy; Rutgers University, New Brunswick, NJ, USA
-
-<sup>5 </sup> Associate Professor, Department of Civil and Environmental Engineering, Carleton University, Ontario, Canada
-
-\* corresponding author: laura.geronimo@rutgers.edu
 
 ## Abstract
 ABSTRACT: 
